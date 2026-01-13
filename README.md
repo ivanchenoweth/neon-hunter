@@ -128,7 +128,9 @@ El servidor maneja señales `SIGINT` y `SIGTERM` y realiza un apagado ordenado (
 
 > Nota: Si necesitas cambiar el puerto en pruebas locales o producción, establece la variable de entorno `PORT` antes de iniciar el servidor (por ejemplo `PORT=4000 node server.js`). Si prefieres, también puedes editar `server.js`.
 
-**Requisito:** Este proyecto requiere Node.js v16 o superior (`engines.node` en `package.json`).
+**Requisito:** Este proyecto requiere **Node.js v20 o superior** (`engines.node` en `package.json`).
+
+**Nota:** La dependencia `cross-env@^10` requiere Node.js v20+. Si necesitas soporte para Node 16/18 en tu entorno, considera usar una versión anterior de `cross-env` o ajustar la dependencia en `package.json`.
 
 ### Consejos rápidos 📝
 
