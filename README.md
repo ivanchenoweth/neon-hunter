@@ -132,6 +132,12 @@ El servidor maneja señales `SIGINT` y `SIGTERM` y realiza un apagado ordenado (
 
 **Nota:** La dependencia `cross-env@^10` requiere Node.js v20+. Si necesitas soporte para Node 16/18 en tu entorno, considera usar una versión anterior de `cross-env` o ajustar la dependencia en `package.json`.
 
+### TODOs / Próximos pasos ✅
+
+- [ ] **Agregar tests de integración básicos** que arranquen y apaguen el servidor (start/shutdown) y verifiquen que endpoints y socket events funcionen. Aprovechar `module.exports = { server, io }` para control en pruebas.
+- [ ] Añadir una carpeta `public/` con un ejemplo `index.html` para facilitar pruebas locales y despliegues.
+- [ ] Documentar el flujo de despliegue en producción (ej. `pm2`, `systemd`) y recomendaciones para `ALLOWED_ORIGIN`.
+
 ### Consejos rápidos 📝
 
 - Para pruebas en la red local, usa la IP de la máquina (ej. `http://192.168.1.5:3000`).
