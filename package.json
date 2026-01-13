@@ -1,0 +1,17 @@
+{
+  "name": "neon-hunter",
+  "version": "1.0.0",
+  "description": "**Neon Hunter** es un vibrante juego tipo arcade de supervivencia y acción. El objetivo principal es **controlar a un cazador neon y sobrevivir** el mayor tiempo posible en un entorno hostil mientras recolectas monedas (coins) y eliminas oleadas de enemigos.",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^5.2.1",
+    "socket.io": "^4.8.3"
+  }
+}
