@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon Hunter</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #0d0d12;
+            color: #ffffff;
+            font-family: 'Outfit', sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            display: block;
+            background: radial-gradient(circle at center, #1a1a24 0%, #000000 100%);
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="gameCanvas"></canvas>
+
+    <script src="SoundController.js"></script>
+    <script src="InputHandler.js"></script>
+    <script src="ObjectPool.js"></script>
+    <script src="Camera.js"></script>
+    <script src="Particle.js"></script>
+    <script src="Bullet.js"></script>
+    <script src="Food.js"></script>
+    <script src="Background.js"></script>
+    <script src="Player.js"></script>
+    <script src="Enemy.js"></script>
+    <script src="SpatialGrid.js"></script>
+    <script src="game.js"></script>
+    <script src="main.js"></script>
+</body>
+
+</html>
