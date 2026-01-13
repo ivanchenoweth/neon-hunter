@@ -9,7 +9,7 @@
     "start:port": "node -e \"process.env.PORT = process.env.PORT || 4000; require('./server');\""
   },
   "engines": {
-    "node": ">=16.0.0"
+    "node": ">=20.0.0"
   },
   "keywords": [],
   "author": "",
