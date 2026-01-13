@@ -30,7 +30,7 @@ Para evitar el "Garbage Collection stutter" (pausas por liberación de memoria),
 
 - Las balas, enemigos y partículas no se crean y destruyen constantemente.
 - Se reutilizan objetos "muertos" de una reserva pre-asignada, manteniendo una huella de memoria estable y un rendimiento fluido.
-  s
+
 
 ---
 
@@ -112,9 +112,23 @@ El proyecto incluye `server.js` para el modo multijugador usando Express + Socke
 
    Nota: `cross-env` se mantuvo en `devDependencies` como opción alternativa si la prefieres.
 
-4. Abre `http://localhost:3000` (o `http://localhost:<PORT>` si usaste otra configuración) en uno o varios navegadores/dispositivos para probar el multijugador. El servidor ya permite conexiones desde cualquier origen (CORS: "*") para facilitar pruebas locales.
+4. Abre `http://localhost:3000` (o `http://localhost:<PORT>` si usaste otra configuración) en uno o varios navegadores/dispositivos para probar el multijugador. El servidor por defecto permite conexiones desde cualquier origen (CORS: "*") para facilitar pruebas locales; en producción deberías restringir `ALLOWED_ORIGIN`:
+
+```bash
+ALLOWED_ORIGIN=https://example.com PORT=4000 node server.js
+```
+
+Puedes también especificar un directorio público diferente con la variable `PUBLIC_DIR` (recomendado en producción):
+
+```bash
+PUBLIC_DIR=public PORT=4000 node server.js
+```
+
+El servidor maneja señales `SIGINT` y `SIGTERM` y realiza un apagado ordenado (graceful shutdown) para cerrar conexiones activas.
 
 > Nota: Si necesitas cambiar el puerto en pruebas locales o producción, establece la variable de entorno `PORT` antes de iniciar el servidor (por ejemplo `PORT=4000 node server.js`). Si prefieres, también puedes editar `server.js`.
+
+**Requisito:** Este proyecto requiere Node.js v16 o superior (`engines.node` en `package.json`).
 
 ### Consejos rápidos 📝
 
