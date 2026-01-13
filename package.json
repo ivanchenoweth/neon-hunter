@@ -8,6 +8,9 @@
     "start": "node server.js",
     "start:port": "node -e \"process.env.PORT = process.env.PORT || 4000; require('./server');\""
   },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
