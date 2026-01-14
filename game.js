@@ -132,7 +132,7 @@ class Game {
         const margin = 20;
 
         const x = this.width - minimapSize - margin;
-        const y = this.height - minimapSize - margin;
+        const y = margin; // move minimap to top-right corner
 
         ctx.save();
         ctx.translate(x, y);
@@ -207,9 +207,9 @@ class Game {
         this.particles = [];
         this.enemyTimer = 0;
 
-        // Hide overlays
-        this.startScreen.classList.add('hidden');
-        this.gameOverScreen.classList.add('hidden');
+        // Hide overlays if present
+        if (this.startScreen && this.startScreen.classList) this.startScreen.classList.add('hidden');
+        if (this.gameOverScreen && this.gameOverScreen.classList) this.gameOverScreen.classList.add('hidden');
     }
 
     takeDamage() {

@@ -30,13 +30,84 @@
             display: block;
             background: radial-gradient(circle at center, #1a1a24 0%, #000000 100%);
         }
+        /* Virtual joystick styles */
+        .vj-container {
+            position: absolute;
+            width: 120px;
+            height: 120px;
+            pointer-events: none;
+            display: none;
+            z-index: 2000;
+            user-select: none;
+        }
+
+        .vj-bg {
+            position: absolute;
+            left: 0; top: 0; right: 0; bottom: 0;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.02);
+            border: 1px dashed rgba(255,255,255,0.06);
+            box-shadow: 0 0 12px rgba(0,255,136,0.04);
+            opacity: 0.9;
+            pointer-events: none;
+        }
+
+        .vj-knob {
+            position: absolute;
+            left: 50%; top: 50%;
+            width: 44px; height: 44px;
+            margin-left: -22px; margin-top: -22px;
+            border-radius: 50%;
+            background: rgba(0,255,136,0.16);
+            border: 2px solid rgba(0,255,136,0.35);
+            transform: translate(0px, 0px);
+            transition: transform 0s linear;
+            pointer-events: none;
+        }
+
+        /* Input mode overlay */
+        .input-overlay {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0,0,0,0.6);
+            z-index: 3000;
+        }
+        .input-card {
+            background: linear-gradient(180deg, rgba(10,10,14,0.95), rgba(6,6,8,0.95));
+            border: 1px solid rgba(0,255,136,0.08);
+            padding: 28px;
+            border-radius: 12px;
+            text-align: center;
+            color: #fff;
+            width: 320px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+        }
+        .input-card h2 { margin-bottom: 6px; color: #00ff88; }
+        .input-card p { margin-bottom: 14px; color: rgba(255,255,255,0.8); }
+        .input-card .btns { display:flex; gap:10px; justify-content:center; }
+        .input-card button { padding: 10px 12px; border-radius:8px; border: none; cursor: pointer; background: #0d0d12; color: #00ff88; font-weight:600; }
+        .input-card button#btnKeyboard { background: rgba(255,255,255,0.05); color: #fff; }
     </style>
 </head>
 
 <body>
+    <div id="inputModeOverlay" class="input-overlay">
+        <div class="input-card">
+            <h2>Selecciona modo de control</h2>
+            <p>Elige cómo quieres jugar:</p>
+            <div class="btns">
+                <button id="btnTouch">Touch — Joysticks virtuales</button>
+                <button id="btnKeyboard">Teclado — WASD + Mouse</button>
+            </div>
+        </div>
+    </div>
     <canvas id="gameCanvas"></canvas>
 
     <script src="SoundController.js"></script>
+    <script src="VirtualJoystick.js"></script>
     <script src="InputHandler.js"></script>
     <script src="ObjectPool.js"></script>
     <script src="Camera.js"></script>
