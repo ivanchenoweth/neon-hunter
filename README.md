@@ -145,5 +145,4 @@ El servidor maneja señales `SIGINT` y `SIGTERM` y realiza un apagado ordenado (
 
 ---
 
-**Autor:** Ivana Lin Chenoweth Galaz
-**Optimización:** Antigravity AI
+**Autor:** Ivan R. Chenoweth
