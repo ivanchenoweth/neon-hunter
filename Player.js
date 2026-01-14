@@ -21,10 +21,16 @@ class Player {
 
         // NOTA: En multijugador, aquí se enviaría el input al servidor
         // y se esperaría la validación de la posición.
-        if (input.keys.w) dy -= 1;
-        if (input.keys.s) dy += 1;
-        if (input.keys.a) dx -= 1;
-        if (input.keys.d) dx += 1;
+        // Preferir joystick izquierdo si está activo (multitouch)
+        if (input.joystickLeft && input.joystickLeft.active) {
+            dx = input.joystickLeft.x;
+            dy = input.joystickLeft.y;
+        } else {
+            if (input.keys.w) dy -= 1;
+            if (input.keys.s) dy += 1;
+            if (input.keys.a) dx -= 1;
+            if (input.keys.d) dx += 1;
+        }
 
         if (dx !== 0 || dy !== 0) {
             const length = Math.sqrt(dx * dx + dy * dy);

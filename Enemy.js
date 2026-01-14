@@ -20,6 +20,9 @@ class Enemy {
 
         this.angle = 0;
 
+        // Ensure spawned enemy is not too far outside current camera view
+        this._adjustSpawnIntoView();
+
         if (!Enemy.spriteCanvas) {
             Enemy.spriteCanvas = document.createElement('canvas');
             const size = this.size;
@@ -129,5 +132,41 @@ class Enemy {
         this.y = Math.max(-halfH, Math.min(halfH, this.y));
         this.angle = 0;
         this.speed = 180 + Math.random() * 70;
+        this._adjustSpawnIntoView();
+    }
+
+    _adjustSpawnIntoView() {
+        // Try to nudge spawn so it isn't far outside the camera view after orientation changes.
+        if (!this.game || !this.game.camera) return;
+        const cam = this.game.camera;
+        const margin = Math.max(this.size, 200);
+
+        // Convert world pos to screen-relative coords
+        const screenX = this.x - cam.x;
+        const screenY = this.y - cam.y;
+
+        // If within extended view, keep
+        if (screenX >= -margin && screenX <= cam.width + margin && screenY >= -margin && screenY <= cam.height + margin) {
+            return;
+        }
+
+        // Otherwise attempt a few times to pick a spawn that lands within extended view
+        for (let i = 0; i < 8; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const distance = 400 + Math.random() * 600; // try somewhat closer ranges too
+            const nx = this.game.player.x + Math.cos(angle) * distance;
+            const ny = this.game.player.y + Math.sin(angle) * distance;
+            const nxScreen = nx - cam.x;
+            const nyScreen = ny - cam.y;
+            if (nxScreen >= -margin && nxScreen <= cam.width + margin && nyScreen >= -margin && nyScreen <= cam.height + margin) {
+                this.x = nx; this.y = ny; return;
+            }
+        }
+
+        // As a fallback, clamp to just inside world bounds near player's edge of view
+        const fallbackAngle = Math.atan2(this.y - this.game.player.y, this.x - this.game.player.x);
+        const fallbackDist = Math.min(Math.max(500, Math.hypot(this.x - this.game.player.x, this.y - this.game.player.y)), 900);
+        this.x = this.game.player.x + Math.cos(fallbackAngle) * fallbackDist;
+        this.y = this.game.player.y + Math.sin(fallbackAngle) * fallbackDist;
     }
 }
