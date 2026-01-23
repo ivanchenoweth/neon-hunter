@@ -2,6 +2,29 @@ window.addEventListener('load', () => {
     const overlay = document.getElementById('inputModeOverlay');
     const btnTouch = document.getElementById('btnTouch');
     const btnKeyboard = document.getElementById('btnKeyboard');
+    const btnZoomIn = document.getElementById('btnZoomIn');
+    const btnZoomOut = document.getElementById('btnZoomOut');
+    const zoomLevelSpan = document.getElementById('zoomLevel');
+
+    window.zoomLevel = 1.0;
+
+    const updateZoomDisplay = () => {
+        zoomLevelSpan.textContent = window.zoomLevel.toFixed(1) + 'x';
+    };
+
+    btnZoomIn.addEventListener('click', () => {
+        if (window.zoomLevel < 1.5) {
+            window.zoomLevel += 0.1;
+            updateZoomDisplay();
+        }
+    });
+
+    btnZoomOut.addEventListener('click', () => {
+        if (window.zoomLevel > 0.6) {
+            window.zoomLevel -= 0.1;
+            updateZoomDisplay();
+        }
+    });
 
     const startWithMode = (mode) => {
         window.inputMode = mode; // 'touch' or 'keyboard'

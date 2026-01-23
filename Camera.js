@@ -1,9 +1,10 @@
 class Camera {
-    constructor(width, height) {
+    constructor(width, height, zoom = 1) {
         this.x = 0;
         this.y = 0;
         this.width = width;
         this.height = height;
+        this.zoom = zoom;
         this.shakePower = 0;
         this.shakeTimer = 0;
     }
@@ -14,8 +15,8 @@ class Camera {
     }
 
     follow(target, deltaTime) {
-        let x = target.x - this.width / 2;
-        let y = target.y - this.height / 2;
+        let x = target.x - (this.width / this.zoom) / 2;
+        let y = target.y - (this.height / this.zoom) / 2;
 
         if (this.shakeTimer > 0) {
             this.shakeTimer -= deltaTime;
