@@ -393,6 +393,12 @@ class Game {
 
         this.particles.forEach(p => p.update());
 
+        // Update player fire direction based on current mouse position (real-time)
+        // Convert screen coordinates to world coordinates, accounting for camera zoom
+        const worldMouseX = (this.input.mouse.x / this.camera.zoom) + this.camera.x;
+        const worldMouseY = (this.input.mouse.y / this.camera.zoom) + this.camera.y;
+        this.player.setFireDirection(worldMouseX, worldMouseY);
+
         // Cleanup de partículas (siempre local)
         for (let i = this.particles.length - 1; i >= 0; i--) {
             if (this.particles[i].markedForDeletion) {
@@ -672,6 +678,13 @@ class Game {
 
     shoot(mouseX, mouseY) {
         if (this.gameState !== this.states.PLAYING) return;
+        // Convert screen coordinates to world coordinates for arrow direction, accounting for zoom
+        const worldMouseX = (mouseX / this.camera.zoom) + this.camera.x;
+        const worldMouseY = (mouseY / this.camera.zoom) + this.camera.y;
+        this.player.setFireDirection(worldMouseX, worldMouseY);
+        // Trigger arrow blink effect
+        this.player.triggerArrowBlink();
+        // But bullets use screen coordinates since player is centered on screen
         this.bullets.push(this.bulletPool.get(this, this.player.x, this.player.y, mouseX, mouseY));
         this.sound.playShoot();
     }
