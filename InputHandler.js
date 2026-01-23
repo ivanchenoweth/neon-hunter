@@ -4,7 +4,11 @@ class InputHandler {
             w: false,
             a: false,
             s: false,
-            d: false
+            d: false,
+            i: false,
+            j: false,
+            l: false,
+            k: false
         };
 
         // Respect input mode: default to 'keyboard' if not set
@@ -12,16 +16,19 @@ class InputHandler {
         this.mouse = { x: 0, y: 0 };
         this.mouseDown = false;
 
-        if (mode === 'keyboard') {
+        if (mode === 'keyboard' || mode === 'keyboardFire') {
             window.addEventListener('keydown', (e) => this.handleKeyDown(e));
             window.addEventListener('keyup', (e) => this.handleKeyUp(e));
 
-            window.addEventListener('mousemove', (e) => {
-                this.mouse.x = e.clientX;
-                this.mouse.y = e.clientY;
-            });
-            window.addEventListener('mousedown', () => this.mouseDown = true);
-            window.addEventListener('mouseup', () => this.mouseDown = false);
+            // For keyboardFire mode, don't use mouse
+            if (mode === 'keyboard') {
+                window.addEventListener('mousemove', (e) => {
+                    this.mouse.x = e.clientX;
+                    this.mouse.y = e.clientY;
+                });
+                window.addEventListener('mousedown', () => this.mouseDown = true);
+                window.addEventListener('mouseup', () => this.mouseDown = false);
+            }
         }
 
         // Virtual joysticks (multitouch)

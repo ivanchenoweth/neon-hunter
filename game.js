@@ -393,10 +393,41 @@ class Game {
 
         this.particles.forEach(p => p.update());
 
-        // Update player fire direction based on current mouse position (real-time)
-        // Convert screen coordinates to world coordinates, accounting for camera zoom
-        const worldMouseX = (this.input.mouse.x / this.camera.zoom) + this.camera.x;
-        const worldMouseY = (this.input.mouse.y / this.camera.zoom) + this.camera.y;
+        // Update player fire direction based on input mode
+        let worldMouseX, worldMouseY;
+        let screenMouseX = this.input.mouse.x;
+        let screenMouseY = this.input.mouse.y;
+        
+        if (window.inputMode === 'keyboardFire') {
+            // For WASD+IJLK mode, use IJLK keys to determine direction
+            let dirX = 0, dirY = 0;
+            if (this.input.keys.i) dirY -= 1;
+            if (this.input.keys.k) dirY += 1;
+            if (this.input.keys.j) dirX -= 1;
+            if (this.input.keys.l) dirX += 1;
+            
+            if (dirX !== 0 || dirY !== 0) {
+                // Normalize diagonal movement
+                const magnitude = Math.sqrt(dirX * dirX + dirY * dirY);
+                dirX /= magnitude;
+                dirY /= magnitude;
+                // Set fire direction based on key input
+                worldMouseX = this.player.x + dirX * 300;
+                worldMouseY = this.player.y + dirY * 300;
+            } else {
+                // If no key pressed, keep current fire direction
+                worldMouseX = this.player.x + this.player.fireDirection.x * 300;
+                worldMouseY = this.player.y + this.player.fireDirection.y * 300;
+            }
+            // Convert world coordinates back to screen coordinates for shooting
+            screenMouseX = (worldMouseX - this.camera.x) * this.camera.zoom;
+            screenMouseY = (worldMouseY - this.camera.y) * this.camera.zoom;
+        } else {
+            // For other modes, use mouse position
+            worldMouseX = (this.input.mouse.x / this.camera.zoom) + this.camera.x;
+            worldMouseY = (this.input.mouse.y / this.camera.zoom) + this.camera.y;
+        }
+        
         this.player.setFireDirection(worldMouseX, worldMouseY);
 
         // Cleanup de partículas (siempre local)
@@ -409,8 +440,19 @@ class Game {
 
         // Shooting logic (Local trigger)
         if (this.shotTimer > 0) this.shotTimer -= deltaTime;
-        if (this.input.mouseDown && this.shotTimer <= 0) {
-            this.shoot(this.input.mouse.x, this.input.mouse.y);
+        
+        // Handle firing based on input mode
+        let shouldShoot = false;
+        if (window.inputMode === 'keyboardFire') {
+            // For WASD+IJLK mode, check if any fire key is pressed
+            shouldShoot = this.input.keys.i || this.input.keys.j || this.input.keys.l || this.input.keys.k;
+        } else {
+            // For other modes, use mouse down
+            shouldShoot = this.input.mouseDown;
+        }
+        
+        if (shouldShoot && this.shotTimer <= 0) {
+            this.shoot(screenMouseX, screenMouseY);
             this.shotTimer = this.shotInterval;
         }
     }
