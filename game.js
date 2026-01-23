@@ -49,7 +49,7 @@ class Game {
 
         this.input = new InputHandler();
         this.sound = new SoundController();
-        this.camera = new Camera(this.width, this.height);
+        this.camera = new Camera(this.width, this.height, window.zoomLevel || 1);
         this.player = new Player(this);
         this.background = new Background(this);
 
@@ -113,6 +113,10 @@ class Game {
         // Resize Bloom canvas
         this.bloomCanvas.width = this.width * this.bloomScale;
         this.bloomCanvas.height = this.height * this.bloomScale;
+
+        // Update camera size
+        this.camera.width = this.width;
+        this.camera.height = this.height;
         this.blurCanvas.width = this.bloomCanvas.width;
         this.blurCanvas.height = this.bloomCanvas.height;
 
@@ -169,8 +173,8 @@ class Game {
         // Draw camera viewport on minimap
         const vx = centerX + this.camera.x * scale;
         const vy = centerY + this.camera.y * scale;
-        const vw = this.camera.width * scale;
-        const vh = this.camera.height * scale;
+        const vw = (this.camera.width / this.camera.zoom) * scale;
+        const vh = (this.camera.height / this.camera.zoom) * scale;
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
         ctx.lineWidth = 1;
         ctx.strokeRect(vx, vy, vw, vh);
@@ -267,7 +271,7 @@ class Game {
         ctx.font = '20px "Outfit", sans-serif';
         ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
         ctx.shadowBlur = 0;
-        ctx.fillText('Sobrevive el mayor tiempo posible', this.width / 2, this.height / 2 - 40);
+        ctx.fillText('Survive as long as possible', this.width / 2, this.height / 2 - 40);
 
         const b = this.btnBounds.start;
         b.x = this.width / 2 - b.w / 2;
@@ -541,6 +545,7 @@ class Game {
 
         // --- Main Draw Pass ---
         ctx.save();
+        ctx.scale(this.camera.zoom, this.camera.zoom);
         ctx.translate(-this.camera.x, -this.camera.y);
 
         this.background.draw(ctx);
@@ -553,15 +558,15 @@ class Game {
         // --- Bloom Draw Pass Preparation ---
         // We only want entities to glow, not the background.
         bCtx.save();
-        bCtx.scale(this.bloomScale, this.bloomScale);
+        bCtx.scale(this.bloomScale * this.camera.zoom, this.bloomScale * this.camera.zoom);
         bCtx.translate(-this.camera.x, -this.camera.y);
 
         // Grid-based culled rendering
         const renderBounds = {
-            x: this.camera.x - 100,
-            y: this.camera.y - 100,
-            width: this.camera.width + 200,
-            height: this.camera.height + 200
+            x: this.camera.x - 100 / this.camera.zoom,
+            y: this.camera.y - 100 / this.camera.zoom,
+            width: (this.camera.width / this.camera.zoom) + 200 / this.camera.zoom,
+            height: (this.camera.height / this.camera.zoom) + 200 / this.camera.zoom
         };
         const visibleEntitiesArr = this.grid.retrieveByBounds(renderBounds);
         const visibleEntities = new Set(visibleEntitiesArr);

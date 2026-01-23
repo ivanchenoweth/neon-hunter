@@ -90,17 +90,26 @@
         .input-card .btns { display:flex; gap:10px; justify-content:center; }
         .input-card button { padding: 10px 12px; border-radius:8px; border: none; cursor: pointer; background: #0d0d12; color: #00ff88; font-weight:600; }
         .input-card button#btnKeyboard { background: rgba(255,255,255,0.05); color: #fff; }
+        .zoom-controls { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+        .zoom-controls label { color: rgba(255,255,255,0.8); font-size: 14px; }
+        .zoom-controls button { padding: 5px 10px; font-size: 18px; }
     </style>
 </head>
 
 <body>
     <div id="inputModeOverlay" class="input-overlay">
         <div class="input-card">
-            <h2>Selecciona modo de control</h2>
-            <p>Elige cómo quieres jugar:</p>
+            <h2>Select control mode</h2>
+            <div class="zoom-controls">
+                <label>Zoom:</label>
+                <button id="btnZoomOut">-</button>
+                <span id="zoomLevel">1.0x</span>
+                <button id="btnZoomIn">+</button>
+            </div>
+            <p>Choose how you want to play:</p>
             <div class="btns">
-                <button id="btnTouch">Touch — Joysticks virtuales</button>
-                <button id="btnKeyboard">Teclado — WASD + Mouse</button>
+                <button id="btnTouch">Touch Joysticks</button>
+                <button id="btnKeyboard">WASD + Mouse</button>
             </div>
         </div>
     </div>
