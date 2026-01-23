@@ -2,6 +2,7 @@ window.addEventListener('load', () => {
     const overlay = document.getElementById('inputModeOverlay');
     const btnTouch = document.getElementById('btnTouch');
     const btnKeyboard = document.getElementById('btnKeyboard');
+    const btnKeyboardFire = document.getElementById('btnKeyboardFire');
     const btnZoomIn = document.getElementById('btnZoomIn');
     const btnZoomOut = document.getElementById('btnZoomOut');
     const zoomLevelSpan = document.getElementById('zoomLevel');
@@ -48,6 +49,7 @@ window.addEventListener('load', () => {
 
     btnTouch.addEventListener('click', () => startWithMode('touch'));
     btnKeyboard.addEventListener('click', () => startWithMode('keyboard'));
+    btnKeyboardFire.addEventListener('click', () => startWithMode('keyboardFire'));
 
     // If no selection after 8s, default to keyboard
     setTimeout(() => {
