@@ -14,14 +14,14 @@ window.addEventListener('load', () => {
     };
 
     btnZoomIn.addEventListener('click', () => {
-        if (window.zoomLevel < 1.5) {
+        if (window.zoomLevel < 2.0) {
             window.zoomLevel += 0.1;
             updateZoomDisplay();
         }
     });
 
     btnZoomOut.addEventListener('click', () => {
-        if (window.zoomLevel > 0.6) {
+        if (window.zoomLevel > 1.0) {
             window.zoomLevel -= 0.1;
             updateZoomDisplay();
         }
