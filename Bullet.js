@@ -8,30 +8,12 @@ class Bullet {
         this.color = '#ffff00';
         this.markedForDeletion = false;
 
-        // Calculate direction
-        // The targetX/Y are in screen coordinates, but we need them in world coordinates relative to the player
-        // However, the camera modifies the view.
-        // Easiest is to unproject the mouse or calculating angle from center screen if player is centered.
-        // Player is ALWAYS centered on screen because of Camera.follow?
-        // Let's check Camera.follow. Yes, centers on target.
-        // So player is at width/2, height/2 on SCREEN.
-        // Mouse is at clientX, clientY on SCREEN.
-        // So vectors are simple screen space diffs.
+        // Use the player's pre-calculated fire direction for perfect sync with arrow
+        this.dx = game.player.fireDirection.x;
+        this.dy = game.player.fireDirection.y;
 
-        const centerX = this.game.width / 2;
-        const centerY = this.game.height / 2;
-
-        const dx = targetX - centerX;
-        const dy = targetY - centerY;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-
-        this.dx = (dx / distance);
-        this.dy = (dy / distance);
-
-        // Proper start position: slightly outside player to avoid visual clip? 
-        // Or just center. Center is fine.
-
-        this.angle = Math.atan2(dy, dx);
+        // Calculate angle for sprite rotation
+        this.angle = Math.atan2(this.dy, this.dx);
 
         if (!Bullet.spriteCanvas) {
             Bullet.spriteCanvas = document.createElement('canvas');

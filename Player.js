@@ -8,6 +8,8 @@ class Player {
         this.color = '#00ff88';
         this.glow = '#00ff88';
         this.trailTimer = 0;
+        this.fireDirection = { x: 0, y: -1 }; // Direction pointer for firing
+        this.arrowBlinkTimer = 0; // Timer for arrow blink effect when firing
     }
 
     /**
@@ -87,6 +89,79 @@ class Player {
         ctx.arc(this.x, this.y, this.radius * 0.4, 0, Math.PI * 2);
         ctx.fill();
 
+        // Draw directional arrow (triangle) outside the circle with curved base
+        const arrowLength = this.radius * 0.45;
+        const arrowWidth = this.radius * 1.15;
+        
+        // Update and check blink timer
+        if (this.arrowBlinkTimer > 0) {
+            this.arrowBlinkTimer -= 16; // Assuming ~60fps
+        }
+        
+        // Calculate arrow color based on blink effect
+        let arrowColor = '#ff00ff'; // Default magenta
+        if (this.arrowBlinkTimer > 0) {
+            // Blend from yellow (#ffff00) to magenta (#ff00ff)
+            const blinkDuration = 150;
+            const blinkProgress = 1 - (this.arrowBlinkTimer / blinkDuration);
+            // Interpolate between yellow and magenta
+            const r = Math.floor(255);
+            const g = Math.floor(255 * (1 - blinkProgress));
+            const b = Math.floor(0);
+            arrowColor = `rgb(${r}, ${g}, ${b})`;
+        }
+        
+        // Calculate the fire direction angle
+        const fireAngle = Math.atan2(this.fireDirection.y, this.fireDirection.x);
+        
+        // Calculate the angular offset for symmetric placement on circle
+        const angleOffset = Math.atan2(arrowWidth, this.radius);
+        
+        // Position arrow at the circumference of the circle
+        const baseOffsetX = this.x + this.fireDirection.x * this.radius;
+        const baseOffsetY = this.y + this.fireDirection.y * this.radius;
+        
+        // Calculate arrow point (tip) - extends outward from the circle
+        const tipX = baseOffsetX + this.fireDirection.x * arrowLength;
+        const tipY = baseOffsetY + this.fireDirection.y * arrowLength;
+        
+        // Base corners positioned symmetrically on the circle
+        const baseAngle1 = fireAngle + angleOffset;
+        const baseAngle2 = fireAngle - angleOffset;
+        
+        const baseX1 = this.x + Math.cos(baseAngle1) * this.radius;
+        const baseY1 = this.y + Math.sin(baseAngle1) * this.radius;
+        const baseX2 = this.x + Math.cos(baseAngle2) * this.radius;
+        const baseY2 = this.y + Math.sin(baseAngle2) * this.radius;
+        
+        // Draw shape with curved base following the player circle
+        ctx.fillStyle = arrowColor;
+        ctx.beginPath();
+        ctx.moveTo(tipX, tipY);
+        ctx.lineTo(baseX1, baseY1);
+        // Arc from baseX1 to baseX2 along the player's circle
+        ctx.arc(this.x, this.y, this.radius, baseAngle1, baseAngle2, true);
+        ctx.lineTo(tipX, tipY);
+        ctx.closePath();
+        ctx.fill();
+
         ctx.restore();
+    }
+
+    setFireDirection(targetX, targetY) {
+        // Calculate direction from player to target in world coordinates
+        const dx = targetX - this.x;
+        const dy = targetY - this.y;
+        const length = Math.sqrt(dx * dx + dy * dy);
+        
+        if (length > 0) {
+            this.fireDirection.x = dx / length;
+            this.fireDirection.y = dy / length;
+        }
+    }
+
+    triggerArrowBlink() {
+        // Trigger the arrow blink effect when firing
+        this.arrowBlinkTimer = 150;
     }
 }
