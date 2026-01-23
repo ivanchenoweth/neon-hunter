@@ -8,7 +8,8 @@ class InputHandler {
             i: false,
             j: false,
             l: false,
-            k: false
+            k: false,
+            p: false
         };
 
         // Respect input mode: default to 'keyboard' if not set
