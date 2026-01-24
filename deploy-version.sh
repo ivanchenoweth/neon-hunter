@@ -49,8 +49,10 @@ generate_pet_name() {
 BRANCH="gh-pages"
 WORKTREE_DIR="../neon-hunter-pages-temp"
 CURRENT_BRANCH=$(git branch --show-current)
+BUILD_DATE=$(date +'%Y-%m-%d %H:%M')
 
 echo ""
+
 echo "╔══════════════════════════════════════════════════════════════════════╗"
 echo "║           🎮 NEON HUNTER - DEPLOY VERSION SCRIPT                    ║"
 echo "╚══════════════════════════════════════════════════════════════════════╝"
@@ -101,21 +103,26 @@ echo "🏷️  Release ID: $RELEASE_ID"
 # PASO 3: Actualizar index.html con la información de la versión
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 echo ""
 echo "📝 Actualizando index.html con la versión..."
 
-# Buscar si ya existe un elemento de versión, si no, agregarlo
-if grep -q "version-badge" index.html; then
-    # Actualizar el badge existente
-    sed -i.bak "s|<span id=\"version-badge\"[^>]*>[^<]*</span>|<span id=\"version-badge\" class=\"version-badge\">${RELEASE_ID}</span>|g" index.html
-else
-    # Agregar el badge de versión después del h2 en input-card
-    sed -i.bak "s|<h2>Select control mode</h2>|<h2>Select control mode</h2>\n            <span id=\"version-badge\" class=\"version-badge\">${RELEASE_ID}</span>|g" index.html
-fi
+# Preparar el bloque HTML de la versión
+VERSION_HTML="<div id=\"version-info\" class=\"version-info\">\n                <span class=\"version-badge\">${RELEASE_ID}</span>\n                <div class=\"version-meta\">${CURRENT_BRANCH} • ${BUILD_DATE}</div>\n            </div>"
 
-# Agregar CSS para el version badge si no existe
-if ! grep -q "\.version-badge" index.html; then
-    sed -i.bak 's|</style>|        .version-badge {\n            display: inline-block;\n            background: linear-gradient(135deg, rgba(0,255,136,0.2), rgba(0,200,100,0.1));\n            border: 1px solid rgba(0,255,136,0.3);\n            color: #00ff88;\n            padding: 4px 12px;\n            border-radius: 20px;\n            font-size: 11px;\n            font-weight: 600;\n            letter-spacing: 0.5px;\n            margin-bottom: 10px;\n            text-shadow: 0 0 10px rgba(0,255,136,0.5);\n        }\n    </style>|g' index.html
+# Eliminar versiones anteriores (limpieza para evitar duplicados o formatos viejos)
+# Esto borra tanto el span solitario viejo como el div nuevo si ya existe
+sed -i.bak '/id="version-badge"/d' index.html
+sed -i.bak '/class="version-info"/,/<\/div>/d' index.html
+
+# Insertar el nuevo bloque después del h2
+# Usamos un archivo temporal para construir el reemplazo porque insertar múltiples líneas con sed es complicado
+sed -i.bak "s|<h2>Select control mode</h2>|<h2>Select control mode</h2>\\
+            ${VERSION_HTML}|" index.html
+
+# Agregar CSS para el version badge y meta si no existe
+if ! grep -q "\.version-meta" index.html; then
+    sed -i.bak 's|</style>|        .version-info {\n            display: flex;\n            flex-direction: column;\n            align-items: center;\n            margin-bottom: 15px;\n        }\n        .version-badge {\n            display: inline-block;\n            background: linear-gradient(135deg, rgba(0,255,136,0.2), rgba(0,200,100,0.1));\n            border: 1px solid rgba(0,255,136,0.3);\n            color: #00ff88;\n            padding: 4px 12px;\n            border-radius: 20px;\n            font-size: 11px;\n            font-weight: 600;\n            letter-spacing: 0.5px;\n            text-shadow: 0 0 10px rgba(0,255,136,0.5);\n            margin-bottom: 4px;\n        }\n        .version-meta {\n            font-size: 10px;\n            color: rgba(255,255,255,0.4);\n            font-weight: 400;\n            font-family: monospace;\n        }\n    </style>|g' index.html
 fi
 
 # Limpiar archivo de backup
