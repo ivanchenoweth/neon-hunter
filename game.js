@@ -601,11 +601,10 @@ class Game {
                         bullet.markedForDeletion = true;
                         this.score += 10;
                         this.updateScore();
-                        this.sound.playExplosion();
-                        for (let i = 0; i < 12; i++) {
-                            const size = Math.random() * 20 + 20;
-                            this.particles.push(this.particlePool.get(this, enemy.x, enemy.y, enemy.color, size));
-                        }
+                        // Calculate speed ratio (0 to 1) based on Enemy speed range (180-250)
+                        const speedRatio = Math.max(0, Math.min(1, (enemy.speed - 180) / 70));
+                        this.sound.playExplosion(speedRatio);
+                        enemy.explode();
                     }
                 }
             });

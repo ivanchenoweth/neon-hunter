@@ -48,6 +48,11 @@ class Enemy {
             this.y += (dy / dist) * this.speed * (deltaTime / 1000);
         }
 
+        // Update swirl effect frequency based on speed
+        // Base frequency scaled by speed (e.g., 0.01 at 100 speed)
+        const swirlFrequency = this.speed * 0.0001;
+        this.swirlTimer += deltaTime * swirlFrequency;
+
         // Separation from other enemies
         const separationDist = this.size * 0.8;
         const nearby = this.game.grid.retrieve(this, separationDist);
@@ -72,18 +77,12 @@ class Enemy {
         });
 
         // Collision with player
-        // NOTA: En un servidor autoritativo, esto se calcularía en el server 
+        // NOTA: En un servidor autoritativo, esto se calcularía en el server
         // y se notificaría al cliente para que reste puntos y cree efectos.
         if (dist < this.game.player.radius + this.size / 2) {
             this.markedForDeletion = true;
-
-            // Esta parte afecta al estado global del juego
             this.game.takeDamage();
-
-            // Explosion particles (Client-side)
-            for (let i = 0; i < 10; i++) {
-                this.game.particles.push(new Particle(this.game, this.x, this.y, this.color));
-            }
+            this.explode();
         }
 
         // Update angle and angular velocity for visual effects
@@ -115,24 +114,93 @@ class Enemy {
 
         // Iconic B-2 Flying Wing with sawtooth trailing edge
         // Tip (Nose)
-        ctx.moveTo(this.size / 2, 0);
+        const tipX = this.size / 2;
+        const wingX = -this.size / 4;
+        const sideY = this.size / 1.5; // Narrower wingspan
+        const innerX = -this.size / 8;
+        const innerY = this.size / 3;
+        const tailX = -this.size / 3; // Center notch
+
+        ctx.moveTo(tipX, 0);
 
         // Leading edge to right wingtip
-        ctx.lineTo(-this.size / 4, -this.size / 1.2);
+        ctx.lineTo(wingX, -sideY);
 
         // Sawtooth trailing edge (W-shape)
-        ctx.lineTo(-this.size / 8, -this.size / 3);
-        ctx.lineTo(-this.size / 3, 0); // Center notch
-        ctx.lineTo(-this.size / 8, this.size / 3);
+        ctx.lineTo(innerX, -innerY);
+        ctx.lineTo(tailX, 0); // Center notch
+        ctx.lineTo(innerX, innerY);
 
         // Trailing edge to left wingtip
-        ctx.lineTo(-this.size / 4, this.size / 1.2);
+        ctx.lineTo(wingX, sideY);
 
         ctx.closePath();
         ctx.fill();
 
-        // 6. High-Performance Thrust Swirl (Fire Gradient) - Scaled by Speed
+        // 5. Create speed-based visual weights (Atmospheric Reentry Effect - AMPLIFIED)
         const speedRatio = (this.speed - 180) / 70; // 0 to 1
+        const rawSwirl = (Math.sin(this.swirlTimer) + 1) / 2; // 0 to 1
+        // Slightly less aggressive bias so the bright peaks are wider
+        const swirlFactor = Math.pow(rawSwirl, 1.2);
+
+        // Reentry Transition: Exact Hull Color (Base) to Pure Neon White-Yellow (Peak)
+        const sHue = this.hue + (50 - this.hue) * swirlFactor;
+        const sLight = this.lightness + (95 - this.lightness) * swirlFactor;
+        const swirlColor = `hsl(${sHue}, 100%, ${sLight}%)`;
+
+        // Dynamic Line Weights (Notoriety + Pulse Heartbeat AMPLIFIED)
+        const notchedSpeedWeight = 2.0 + speedRatio * 2.0;
+        const pulseWeight = 1.0 + (swirlFactor * 1.0); // 100% extra thickness at peak (Doubled)
+        const baseLineWidth = notchedSpeedWeight * pulseWeight;
+        const frontMultiplier = 1.5;
+
+        // --- DRAW BODY FIRST (Common fill) ---
+        ctx.beginPath();
+        ctx.moveTo(tipX, 0);
+        ctx.lineTo(wingX, -sideY);
+        ctx.lineTo(innerX, -innerY);
+        ctx.lineTo(tailX, 0);
+        ctx.lineTo(innerX, innerY);
+        ctx.lineTo(wingX, sideY);
+        ctx.closePath();
+        ctx.fill();
+
+        // --- DRAW FRONT EDGES (Leading edges) ---
+        ctx.strokeStyle = swirlColor;
+        ctx.lineWidth = baseLineWidth * frontMultiplier;
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.moveTo(wingX, -sideY); // Start at port wingtip
+        ctx.lineTo(tipX, 0); // To nose
+        ctx.lineTo(wingX, sideY); // To starboard wingtip
+        ctx.stroke();
+
+        // --- DRAW REAR EDGES (Trailing sawtooth) ---
+        ctx.lineWidth = baseLineWidth;
+        ctx.beginPath();
+        ctx.moveTo(wingX, sideY); // Start starboard wingtip
+        ctx.lineTo(innerX, innerY);
+        ctx.lineTo(tailX, 0);
+        ctx.lineTo(innerX, -innerY);
+        ctx.lineTo(wingX, -sideY); // Finish port wingtip
+        ctx.stroke();
+
+        // 6. Cockpit Surge Effect (Yellow to White Swirl - Enlarged)
+        // A prominent energy cockpit at the nose tip
+        const cockpitFactor = (Math.sin(this.swirlTimer + Math.PI / 2) + 1) / 2;
+        const cb = Math.floor(255 * (0.4 + cockpitFactor * 0.6));
+        const cockpitColor = `rgb(255, 255, ${cb})`;
+
+        ctx.fillStyle = cockpitColor;
+        ctx.beginPath();
+        ctx.moveTo(tipX - 1, 0);      // Front tip
+        ctx.lineTo(tipX - 16, -5);    // Port side 
+        ctx.lineTo(tipX - 22, 0);     // Rear tip
+        ctx.lineTo(tipX - 16, 5);     // Starboard side
+        ctx.closePath();
+        ctx.fill();
+
+        // 7. High-Performance Thrust Swirl (Fire Gradient) - Scaled by Speed
 
         // Flicker effect using time - faster enemies flicker more intensely
         const time = performance.now() * (0.01 + speedRatio * 0.01);
@@ -190,6 +258,7 @@ class Enemy {
         this.angle = 0;
         this.angularVelocity = 0;
         this.speed = 180 + Math.random() * 70;
+        this.swirlTimer = 0; // Timer for edge color swirl
 
         // Update dark orange to saturated red color based on new speed
         const speedRatio = (this.speed - 180) / 70;
@@ -233,5 +302,33 @@ class Enemy {
         const fallbackDist = Math.min(Math.max(500, Math.hypot(this.x - this.game.player.x, this.y - this.game.player.y)), 900);
         this.x = this.game.player.x + Math.cos(fallbackAngle) * fallbackDist;
         this.y = this.game.player.y + Math.sin(fallbackAngle) * fallbackDist;
+    }
+
+    explode() {
+        // 15% chance for a "Dud" (boring) explosion for organic variety
+        const isDud = Math.random() < 0.15;
+        const particleCount = isDud ? 8 : 25;
+
+        for (let i = 0; i < particleCount; i++) {
+            let pColor = this.color;
+            let size = null;
+            let speedMult = 1.0;
+            let jitter = 0;
+
+            // Molten debris / Chunks (Sub-explosions)
+            if (!isDud && Math.random() < 0.4) {
+                pColor = `hsl(55, 100%, 80%)`;
+                size = Math.random() * 12 + 8;
+                speedMult = 2.0;
+                jitter = 2;
+            }
+
+            const p = new Particle(this.game, this.x, this.y, pColor, size);
+            p.speedX *= speedMult;
+            p.speedY *= speedMult;
+            p.jitter = jitter;
+
+            this.game.particles.push(p);
+        }
     }
 }
