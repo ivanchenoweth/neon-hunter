@@ -4,19 +4,96 @@
     <meta charset='UTF-8'>
     <meta name='viewport' content='width=device-width, initial-scale=1.0'>
     <title>Neon Hunter - Versions</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        body { background: #0d0d12; color: #fff; font-family: 'Courier New', monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
-        h1 { color: #00ff88; text-shadow: 0 0 10px rgba(0,255,136,0.5); margin-bottom: 2rem; }
-        .version-list { list-style: none; padding: 0; width: 100%; max-width: 400px; }
-        .version-item { margin: 10px 0; }
-        .version-link { display: block; padding: 15px 20px; background: rgba(255,255,255,0.05); border: 1px solid rgba(0,255,136,0.2); color: #fff; text-decoration: none; border-radius: 8px; transition: all 0.3s; text-align: center; font-size: 1.2rem; }
-        .version-link:hover { background: rgba(0,255,136,0.1); border-color: #00ff88; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            background: linear-gradient(135deg, #0d0d12 0%, #1a1a24 50%, #0d0d12 100%);
+            color: #fff; 
+            font-family: 'Outfit', sans-serif; 
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+        .container { max-width: 600px; margin: 0 auto; }
+        h1 { 
+            color: #00ff88; 
+            text-shadow: 0 0 20px rgba(0,255,136,0.5); 
+            margin-bottom: 10px;
+            font-size: 2.5rem;
+            text-align: center;
+        }
+        .subtitle {
+            color: rgba(255,255,255,0.6);
+            text-align: center;
+            margin-bottom: 40px;
+            font-size: 1rem;
+        }
+        .version-list { list-style: none; }
+        .version-item { margin: 15px 0; }
+        .version-link { 
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 24px; 
+            background: rgba(255,255,255,0.03); 
+            border: 1px solid rgba(0,255,136,0.15); 
+            color: #fff; 
+            text-decoration: none; 
+            border-radius: 12px; 
+            transition: all 0.3s ease;
+        }
+        .version-link:hover { 
+            background: rgba(0,255,136,0.08); 
+            border-color: #00ff88; 
+            transform: translateY(-3px); 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4), 0 0 20px rgba(0,255,136,0.1);
+        }
+        .version-name {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #00ff88;
+        }
+        .version-pet-name {
+            font-size: 0.9rem;
+            color: rgba(255,255,255,0.6);
+            text-transform: capitalize;
+        }
+        .play-btn {
+            background: linear-gradient(135deg, #00ff88, #00cc6f);
+            color: #0d0d12;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 0.85rem;
+        }
     </style>
 </head>
 <body>
-    <h1>Neon Hunter Releases</h1>
-    <ul class='version-list'>
-        <li class='version-item'><a class='version-link' href='releases/v1/index.html'>v1</a></li>
-    </ul>
+    <div class="container">
+        <h1>🎮 Neon Hunter</h1>
+        <p class="subtitle">Select a version to play</p>
+        <ul class='version-list'>
+            <li class='version-item'>
+                <a class='version-link' href='releases/v3.0/index.html'>
+                    <div>
+                        <div class='version-name'>v3.0</div>
+                        <div class='version-pet-name'>classic</div>
+                    </div>
+                    <span class='play-btn'>▶ PLAY</span>
+                </a>
+            </li>
+            <li class='version-item'>
+                <a class='version-link' href='releases/v1/index.html'>
+                    <div>
+                        <div class='version-name'>v1</div>
+                        <div class='version-pet-name'>classic</div>
+                    </div>
+                    <span class='play-btn'>▶ PLAY</span>
+                </a>
+            </li>
+        </ul>
+    </div>
 </body>
 </html>
