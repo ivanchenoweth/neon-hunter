@@ -87,7 +87,9 @@ class Game {
             GAME_OVER: 'GAME_OVER'
         };
         this.gameState = this.states.INITIAL;
-        this.lives = 3;
+        this.lives = 5;
+        this.maxLives = 5;  // Track max lives for speed calculation
+        this.baseSpeed = 350;  // Base player speed
 
         // Pause button bounds
         this.pauseBtnBounds = { x: 0, y: 0, w: 150, h: 60 };
@@ -179,20 +181,20 @@ class Game {
         const spawnMaxDistance = 1000;
         const px = centerX + this.player.x * scale;
         const py = centerY + this.player.y * scale;
-        
+
         // Draw outer spawn ring (max distance)
         ctx.strokeStyle = 'rgba(255, 100, 100, 0.3)';
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.arc(px, py, spawnMaxDistance * scale, 0, Math.PI * 2);
         ctx.stroke();
-        
+
         // Draw inner spawn ring (min distance)
         ctx.strokeStyle = 'rgba(255, 100, 100, 0.5)';
         ctx.beginPath();
         ctx.arc(px, py, spawnMinDistance * scale, 0, Math.PI * 2);
         ctx.stroke();
-        
+
         // Fill the spawn ring area with semi-transparent red (between inner and outer rings only)
         ctx.fillStyle = 'rgba(255, 100, 100, 0.25)';
         ctx.beginPath();
@@ -231,7 +233,8 @@ class Game {
         this.gameState = this.states.PLAYING;
         this.score = 0;
         this.coins = 0;
-        this.lives = 3;
+        this.lives = 5;
+        this.player.speed = this.baseSpeed;  // Reset player speed on game start
         this.foodCollectedCount = 0;
         this.enemies = [];
         this.bullets = [];
@@ -250,6 +253,11 @@ class Game {
         this.lives--;
         this.sound.playDamage();
         this.camera.shake(20, 300);
+
+        // Reduce player speed based on remaining lives (more lives = faster)
+        // Speed ranges from 50% to 100% of base speed
+        const speedMultiplier = 0.5 + (this.lives / this.maxLives) * 0.5;
+        this.player.speed = this.baseSpeed * speedMultiplier;
 
         if (this.lives <= 0) {
             this.gameOver();
@@ -447,7 +455,7 @@ class Game {
         let worldMouseX, worldMouseY;
         let screenMouseX = this.input.mouse.x;
         let screenMouseY = this.input.mouse.y;
-        
+
         if (window.inputMode === 'keyboardFire') {
             // For WASD+IJLK mode, use IJLK keys to determine direction
             let dirX = 0, dirY = 0;
@@ -455,7 +463,7 @@ class Game {
             if (this.input.keys.k) dirY += 1;
             if (this.input.keys.j) dirX -= 1;
             if (this.input.keys.l) dirX += 1;
-            
+
             if (dirX !== 0 || dirY !== 0) {
                 // Normalize diagonal movement
                 const magnitude = Math.sqrt(dirX * dirX + dirY * dirY);
@@ -477,7 +485,7 @@ class Game {
             worldMouseX = (this.input.mouse.x / this.camera.zoom) + this.camera.x;
             worldMouseY = (this.input.mouse.y / this.camera.zoom) + this.camera.y;
         }
-        
+
         this.player.setFireDirection(worldMouseX, worldMouseY);
 
         // Cleanup de partículas (siempre local)
@@ -490,7 +498,7 @@ class Game {
 
         // Shooting logic (Local trigger)
         if (this.shotTimer > 0) this.shotTimer -= deltaTime;
-        
+
         // Handle firing based on input mode
         let shouldShoot = false;
         if (window.inputMode === 'keyboardFire') {
@@ -500,7 +508,7 @@ class Game {
             // For other modes, use mouse down
             shouldShoot = this.input.mouseDown;
         }
-        
+
         if (shouldShoot && this.shotTimer <= 0) {
             this.shoot(screenMouseX, screenMouseY);
             this.shotTimer = this.shotInterval;
