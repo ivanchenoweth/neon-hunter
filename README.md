@@ -151,57 +151,45 @@ El proyecto incluye un script automatizado para desplegar versiones del juego a 
 
 ### Cómo liberar una nueva versión
 
-Para desplegar una versión del juego desde cualquier rama:
+El nuevo sistema de despliegue es completamente automático y puede ejecutarse desde cualquier rama.
 
 ```bash
-# 1. Cambia a la rama que quieres desplegar
-git checkout main  # o cualquier otra rama (feat/18, etc.)
-
-# 2. Ejecuta el script de despliegue con el número de versión
-bash deploy-version.sh v1
+# Ejecuta el script sin argumentos
+./deploy-version.sh
 ```
 
-**Ejemplos:**
+El script automáticamente:
+1.  🔮 **Calcula la siguiente versión** (v3.0 -> v4.0, etc.)
+2.  🐾 **Genera un Pet Name** único basado en el commit (ej. `frost-ranger`, `cyber-dragon`)
+3.  🏷️ **Crea un Tag** de Git con toda la metadata
+4.  📦 **Crea un GitHub Release** con notas automáticas (si tienes `gh` CLI instalado)
+5.  🚀 **Despliega a GitHub Pages** y actualiza el índice de versiones
 
-```bash
-# Desplegar versión 1 desde la rama main
-git checkout main
-bash deploy-version.sh v1
+**Ejemplo de flujo de trabajo:**
 
-# Desplegar versión 2 desde una rama de features
-git checkout feat/18
-bash deploy-version.sh v2
-
-# Desplegar una versión beta
-git checkout develop
-bash deploy-version.sh v1.5-beta
-```
-
-### ¿Qué hace el script?
-
-1. ✅ Crea/actualiza la rama `gh-pages` automáticamente
-2. ✅ Copia todos los archivos del juego (HTML, JS, CSS) a `releases/[VERSION]/`
-3. ✅ Genera un índice HTML con enlaces a todas las versiones desplegadas
-4. ✅ Sube los cambios a GitHub Pages
+1.  Estás trabajando en una nueva feature en la rama `feat/naves-enemigas`
+2.  Terminas tus cambios y haces commit
+3.  Ejecutas `./deploy-version.sh`
+4.  ¡Listo! Se crea la versión `v4.0-neon-viper` (ejemplo) y te da el link para probarla.
 
 ### URLs de acceso
 
 Después del despliegue (tarda 1-2 minutos en estar disponible):
 
 - **Índice de versiones:** `https://[tu-usuario].github.io/neon-hunter/`
-- **Versión específica:** `https://[tu-usuario].github.io/neon-hunter/releases/[VERSION]/`
+- **Versión específica:** `https://[tu-usuario].github.io/neon-hunter/releases/v3.0/`
 
 **Ejemplo:**
 - Índice: https://ivanchenoweth.github.io/neon-hunter/
-- Versión 1: https://ivanchenoweth.github.io/neon-hunter/releases/v1/
-- Versión 2: https://ivanchenoweth.github.io/neon-hunter/releases/v2/
+- Versión 3.0: https://ivanchenoweth.github.io/neon-hunter/releases/v3.0/
 
 ### Notas importantes
 
-- 📌 El script **NO** modifica tu rama de trabajo actual
-- 📌 Cada versión se mantiene independiente en su carpeta
-- 📌 Puedes tener múltiples versiones desplegadas simultáneamente
-- 📌 El archivo `.nojekyll` en `gh-pages` asegura que GitHub Pages sirva todos los archivos correctamente
+- 📌 **No necesitas especificar versión**, el script la calcula sola.
+- 📌 El script **NO** modifica tu rama de trabajo actual (usa worktrees).
+- 📌 Cada versión se mantiene independiente en su carpeta.
+- 📌 El pet name (`frost-ranger`) es determinístico: siempre será el mismo para el mismo commit.
+- 📌 El archivo `.nojekyll` en `gh-pages` asegura que GitHub Pages sirva todos los archivos correctamente.
 
 ---
 
