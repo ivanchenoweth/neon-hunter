@@ -132,6 +132,79 @@ El servidor maneja señales `SIGINT` y `SIGTERM` y realiza un apagado ordenado (
 
 **Nota:** La dependencia `cross-env@^10` requiere Node.js v20+. Si necesitas soporte para Node 16/18 en tu entorno, considera usar una versión anterior de `cross-env` o ajustar la dependencia en `package.json`.
 
+---
+
+## 📦 Liberación de Versiones
+
+El proyecto incluye un script automatizado para desplegar versiones del juego a **GitHub Pages**.
+
+### Configuración inicial (solo una vez)
+
+1. **Habilita GitHub Pages en tu repositorio:**
+   - Ve a: `https://github.com/[tu-usuario]/neon-hunter/settings/pages`
+   - En **"Source"**, selecciona:
+     - **Branch:** `gh-pages`
+     - **Folder:** `/ (root)`
+   - Haz clic en **"Save"**
+
+2. **Asegúrate de tener permisos de escritura** en la rama `gh-pages`.
+
+### Cómo liberar una nueva versión
+
+Para desplegar una versión del juego desde cualquier rama:
+
+```bash
+# 1. Cambia a la rama que quieres desplegar
+git checkout main  # o cualquier otra rama (feat/18, etc.)
+
+# 2. Ejecuta el script de despliegue con el número de versión
+bash deploy-version.sh v1
+```
+
+**Ejemplos:**
+
+```bash
+# Desplegar versión 1 desde la rama main
+git checkout main
+bash deploy-version.sh v1
+
+# Desplegar versión 2 desde una rama de features
+git checkout feat/18
+bash deploy-version.sh v2
+
+# Desplegar una versión beta
+git checkout develop
+bash deploy-version.sh v1.5-beta
+```
+
+### ¿Qué hace el script?
+
+1. ✅ Crea/actualiza la rama `gh-pages` automáticamente
+2. ✅ Copia todos los archivos del juego (HTML, JS, CSS) a `releases/[VERSION]/`
+3. ✅ Genera un índice HTML con enlaces a todas las versiones desplegadas
+4. ✅ Sube los cambios a GitHub Pages
+
+### URLs de acceso
+
+Después del despliegue (tarda 1-2 minutos en estar disponible):
+
+- **Índice de versiones:** `https://[tu-usuario].github.io/neon-hunter/`
+- **Versión específica:** `https://[tu-usuario].github.io/neon-hunter/releases/[VERSION]/`
+
+**Ejemplo:**
+- Índice: https://ivanchenoweth.github.io/neon-hunter/
+- Versión 1: https://ivanchenoweth.github.io/neon-hunter/releases/v1/
+- Versión 2: https://ivanchenoweth.github.io/neon-hunter/releases/v2/
+
+### Notas importantes
+
+- 📌 El script **NO** modifica tu rama de trabajo actual
+- 📌 Cada versión se mantiene independiente en su carpeta
+- 📌 Puedes tener múltiples versiones desplegadas simultáneamente
+- 📌 El archivo `.nojekyll` en `gh-pages` asegura que GitHub Pages sirva todos los archivos correctamente
+
+---
+
 ### TODOs / Próximos pasos ✅
 
 - [ ] **Agregar tests de integración básicos** que arranquen y apaguen el servidor (start/shutdown) y verifiquen que endpoints y socket events funcionen. Aprovechar `module.exports = { server, io }` para control en pruebas.
