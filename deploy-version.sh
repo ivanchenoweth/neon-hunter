@@ -154,6 +154,29 @@ git push origin "$CURRENT_BRANCH" --follow-tags
 echo "✅ Tag y commits subidos a origin"
 
 # ─────────────────────────────────────────────────────────────────────────────
+# PASO 5.5: Crear GitHub Release
+# ─────────────────────────────────────────────────────────────────────────────
+
+echo ""
+echo "📦 Creando GitHub Release..."
+
+# Intentar crear release con gh CLI (si está disponible)
+if command -v gh &> /dev/null; then
+    gh release create "$NEXT_VERSION" \
+        --title "${RELEASE_ID}" \
+        --notes "## 🎮 ${RELEASE_ID}
+
+**Pet Name:** ${PET_NAME}
+**Branch:** ${CURRENT_BRANCH}
+**Commit:** ${SHORT_HASH}
+
+🌐 [Play this version](https://ivanchenoweth.github.io/neon-hunter/releases/${NEXT_VERSION}/)" \
+        --target "$CURRENT_BRANCH" 2>/dev/null && echo "✅ GitHub Release creado" || echo "⚠️  No se pudo crear GitHub Release (puede requerir permisos adicionales)"
+else
+    echo "⚠️  gh CLI no disponible, saltando creación de GitHub Release"
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
 # PASO 6: Desplegar a GitHub Pages
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -206,6 +229,9 @@ rsync -av \
     --include 'assets***' \
     --exclude '*' \
     ./ "$TARGET_DIR/"
+
+# Crear archivo de metadata con el pet name para lectura posterior
+echo "$PET_NAME" > "$TARGET_DIR/.pet-name"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PASO 7: Generar índice de versiones
@@ -299,10 +325,14 @@ EOF
 for d in $(ls -rd "$WORKTREE_DIR/releases"/*/ 2>/dev/null); do
     if [ -d "$d" ]; then
         dir_name=$(basename "$d")
-        # Intentar extraer el pet name del index.html de esa versión
+        # Intentar extraer el pet name del archivo .pet-name o del index.html
         pet_name=""
-        if [ -f "$d/index.html" ]; then
-            pet_name=$(grep -oP 'version-badge">[^<]*-\K[^<]+' "$d/index.html" 2>/dev/null || echo "")
+        if [ -f "$d/.pet-name" ]; then
+            pet_name=$(cat "$d/.pet-name" 2>/dev/null)
+        fi
+        if [ -z "$pet_name" ] && [ -f "$d/index.html" ]; then
+            # Extraer pet name usando sed (compatible con macOS)
+            pet_name=$(sed -n 's/.*version-badge[^>]*>\([^<]*\)<.*/\1/p' "$d/index.html" 2>/dev/null | head -1 | sed 's/.*-//')
         fi
         if [ -z "$pet_name" ]; then
             pet_name="classic"
