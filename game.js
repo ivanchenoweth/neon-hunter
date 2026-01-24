@@ -87,7 +87,7 @@ class Game {
             GAME_OVER: 'GAME_OVER'
         };
         this.gameState = this.states.INITIAL;
-        this.lives = 3;
+        this.lives = 5;
 
         // Pause button bounds
         this.pauseBtnBounds = { x: 0, y: 0, w: 150, h: 60 };
@@ -179,20 +179,20 @@ class Game {
         const spawnMaxDistance = 1000;
         const px = centerX + this.player.x * scale;
         const py = centerY + this.player.y * scale;
-        
+
         // Draw outer spawn ring (max distance)
         ctx.strokeStyle = 'rgba(255, 100, 100, 0.3)';
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.arc(px, py, spawnMaxDistance * scale, 0, Math.PI * 2);
         ctx.stroke();
-        
+
         // Draw inner spawn ring (min distance)
         ctx.strokeStyle = 'rgba(255, 100, 100, 0.5)';
         ctx.beginPath();
         ctx.arc(px, py, spawnMinDistance * scale, 0, Math.PI * 2);
         ctx.stroke();
-        
+
         // Fill the spawn ring area with semi-transparent red (between inner and outer rings only)
         ctx.fillStyle = 'rgba(255, 100, 100, 0.25)';
         ctx.beginPath();
@@ -231,7 +231,7 @@ class Game {
         this.gameState = this.states.PLAYING;
         this.score = 0;
         this.coins = 0;
-        this.lives = 3;
+        this.lives = 5;
         this.foodCollectedCount = 0;
         this.enemies = [];
         this.bullets = [];
@@ -270,16 +270,39 @@ class Game {
         if (this.gameState === this.states.INITIAL) {
             const b = this.btnBounds.start;
             if (mouseX >= b.x && mouseX <= b.x + b.w && mouseY >= b.y && mouseY <= b.y + b.h) {
+                this.triggerButtonExplosion(b.x + b.w / 2, b.y + b.h / 2);
                 this.startGame();
                 this.sound.playCollect();
             }
         } else if (this.gameState === this.states.GAME_OVER) {
             const b = this.btnBounds.restart;
             if (mouseX >= b.x && mouseX <= b.x + b.w && mouseY >= b.y && mouseY <= b.y + b.h) {
+                this.triggerButtonExplosion(b.x + b.w / 2, b.y + b.h / 2);
                 this.startGame();
                 this.sound.playCollect();
             }
         }
+    }
+
+    triggerButtonExplosion(x, y) {
+        // Create a massive particle explosion at the button center
+        // Particles use world coordinates, but button is at screen coords
+        // So we need to convert screen coords to world coords to place them correctly in the world grid
+        const worldX = (x / this.camera.zoom) + this.camera.x;
+        const worldY = (y / this.camera.zoom) + this.camera.y;
+
+        for (let i = 0; i < 40; i++) {
+            const color = i % 2 === 0 ? '#00ff88' : '#ffffff';
+            const size = Math.random() * 15 + 10;
+            const p = this.particlePool.get(this, worldX, worldY, color, size);
+            // Increase speed for button explosion
+            p.speedX *= 2.5;
+            p.speedY *= 2.5;
+            this.particles.push(p);
+        }
+
+        // Add screen shake
+        this.camera.shake(10, 200);
     }
 
     drawStartScreen(ctx) {
@@ -447,7 +470,7 @@ class Game {
         let worldMouseX, worldMouseY;
         let screenMouseX = this.input.mouse.x;
         let screenMouseY = this.input.mouse.y;
-        
+
         if (window.inputMode === 'keyboardFire') {
             // For WASD+IJLK mode, use IJLK keys to determine direction
             let dirX = 0, dirY = 0;
@@ -455,7 +478,7 @@ class Game {
             if (this.input.keys.k) dirY += 1;
             if (this.input.keys.j) dirX -= 1;
             if (this.input.keys.l) dirX += 1;
-            
+
             if (dirX !== 0 || dirY !== 0) {
                 // Normalize diagonal movement
                 const magnitude = Math.sqrt(dirX * dirX + dirY * dirY);
@@ -477,7 +500,7 @@ class Game {
             worldMouseX = (this.input.mouse.x / this.camera.zoom) + this.camera.x;
             worldMouseY = (this.input.mouse.y / this.camera.zoom) + this.camera.y;
         }
-        
+
         this.player.setFireDirection(worldMouseX, worldMouseY);
 
         // Cleanup de partículas (siempre local)
@@ -490,7 +513,7 @@ class Game {
 
         // Shooting logic (Local trigger)
         if (this.shotTimer > 0) this.shotTimer -= deltaTime;
-        
+
         // Handle firing based on input mode
         let shouldShoot = false;
         if (window.inputMode === 'keyboardFire') {
@@ -500,7 +523,7 @@ class Game {
             // For other modes, use mouse down
             shouldShoot = this.input.mouseDown;
         }
-        
+
         if (shouldShoot && this.shotTimer <= 0) {
             this.shoot(screenMouseX, screenMouseY);
             this.shotTimer = this.shotInterval;
@@ -578,11 +601,10 @@ class Game {
                         bullet.markedForDeletion = true;
                         this.score += 10;
                         this.updateScore();
-                        this.sound.playExplosion();
-                        for (let i = 0; i < 12; i++) {
-                            const size = Math.random() * 20 + 20;
-                            this.particles.push(this.particlePool.get(this, enemy.x, enemy.y, enemy.color, size));
-                        }
+                        // Calculate speed ratio (0 to 1) based on Enemy speed range (180-250)
+                        const speedRatio = Math.max(0, Math.min(1, (enemy.speed - 180) / 70));
+                        this.sound.playExplosion(speedRatio);
+                        enemy.explode();
                     }
                 }
             });
@@ -634,6 +656,23 @@ class Game {
         } else if (this.input.keys.p && this.gameState === this.states.PAUSED) {
             this.gameState = this.states.PLAYING;
             this.input.keys.p = false; // Consume the key press
+        }
+
+        // Check for Space to Start/Restart
+        if (this.input.keys[' ']) {
+            if (this.gameState === this.states.INITIAL) {
+                const b = this.btnBounds.start;
+                this.triggerButtonExplosion(b.x + b.w / 2, b.y + b.h / 2);
+                this.startGame();
+                this.sound.playCollect();
+                this.input.keys[' '] = false;
+            } else if (this.gameState === this.states.GAME_OVER) {
+                const b = this.btnBounds.restart;
+                this.triggerButtonExplosion(b.x + b.w / 2, b.y + b.h / 2);
+                this.startGame();
+                this.sound.playCollect();
+                this.input.keys[' '] = false;
+            }
         }
 
         const movementInfo = this.updateState(deltaTime);

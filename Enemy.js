@@ -3,7 +3,14 @@ class Enemy {
         this.game = game;
         this.size = 50;
         this.speed = 180 + Math.random() * 70;
-        this.color = '#ff4444';
+
+        // Dark Orange to Saturated Red gradient based on speed
+        // Speed range: 180 to 250 (delta 70)
+        const speedRatio = (this.speed - 180) / 70;
+        const hue = 35 * (1 - speedRatio);        // 35 (Orange) to 0 (Red)
+        const saturation = 100;                    // Always saturated
+        const lightness = 25 + speedRatio * 25;    // 25% (Dark) to 50% (Bright)
+        this.color = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
         this.markedForDeletion = false;
 
         // Spawn somewhere around the player but at a distance
@@ -23,22 +30,7 @@ class Enemy {
         // Ensure spawned enemy is not too far outside current camera view
         this._adjustSpawnIntoView();
 
-        if (!Enemy.spriteCanvas) {
-            Enemy.spriteCanvas = document.createElement('canvas');
-            const size = this.size;
-            Enemy.spriteCanvas.width = size * 1.5;
-            Enemy.spriteCanvas.height = size * 1.5;
-            const sCtx = Enemy.spriteCanvas.getContext('2d');
-            sCtx.translate(size * 0.75, size * 0.75);
-            sCtx.fillStyle = this.color;
-            sCtx.beginPath();
-            sCtx.moveTo(size / 2, 0);
-            sCtx.lineTo(-size / 2, -size / 2.5);
-            sCtx.lineTo(-size / 3, 0);
-            sCtx.lineTo(-size / 2, size / 2.5);
-            sCtx.fill();
-            sCtx.closePath();
-        }
+        // Sprite rendering is now dynamic per-enemy based on color/speed
     }
 
     /**
@@ -55,6 +47,11 @@ class Enemy {
             this.x += (dx / dist) * this.speed * (deltaTime / 1000);
             this.y += (dy / dist) * this.speed * (deltaTime / 1000);
         }
+
+        // Update swirl effect frequency based on speed
+        // Base frequency scaled by speed (e.g., 0.01 at 100 speed)
+        const swirlFrequency = this.speed * 0.0001;
+        this.swirlTimer += deltaTime * swirlFrequency;
 
         // Separation from other enemies
         const separationDist = this.size * 0.8;
@@ -80,22 +77,25 @@ class Enemy {
         });
 
         // Collision with player
-        // NOTA: En un servidor autoritativo, esto se calcularía en el server 
+        // NOTA: En un servidor autoritativo, esto se calcularía en el server
         // y se notificaría al cliente para que reste puntos y cree efectos.
         if (dist < this.game.player.radius + this.size / 2) {
             this.markedForDeletion = true;
-
-            // Esta parte afecta al estado global del juego
             this.game.takeDamage();
-
-            // Explosion particles (Client-side)
-            for (let i = 0; i < 10; i++) {
-                this.game.particles.push(new Particle(this.game, this.x, this.y, this.color));
-            }
+            this.explode();
         }
 
-        // Update angle
+        // Update angle and angular velocity for visual effects
+        const lastAngle = this.angle;
         this.angle = Math.atan2(dy, dx);
+
+        // Handle angular wrap-around for velocity calculation
+        let angleDiff = this.angle - lastAngle;
+        if (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+        if (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+
+        // Smooth the angular velocity
+        this.angularVelocity = this.angularVelocity * 0.8 + angleDiff * 0.2;
     }
 
     // Deprecated for multiplayer readiness
@@ -108,12 +108,137 @@ class Enemy {
         ctx.translate(this.x, this.y);
         ctx.rotate(this.angle);
 
-        ctx.drawImage(
-            Enemy.spriteCanvas,
-            -this.size * 0.75,
-            -this.size * 0.75
-        );
+        // 5. Draw Enemy Body (B-2 Spirit Style Flying Wing)
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
 
+        // Iconic B-2 Flying Wing with sawtooth trailing edge
+        // Tip (Nose)
+        const tipX = this.size / 2;
+        const wingX = -this.size / 4;
+        const sideY = this.size / 1.5; // Narrower wingspan
+        const innerX = -this.size / 8;
+        const innerY = this.size / 3;
+        const tailX = -this.size / 3; // Center notch
+
+        ctx.moveTo(tipX, 0);
+
+        // Leading edge to right wingtip
+        ctx.lineTo(wingX, -sideY);
+
+        // Sawtooth trailing edge (W-shape)
+        ctx.lineTo(innerX, -innerY);
+        ctx.lineTo(tailX, 0); // Center notch
+        ctx.lineTo(innerX, innerY);
+
+        // Trailing edge to left wingtip
+        ctx.lineTo(wingX, sideY);
+
+        ctx.closePath();
+        ctx.fill();
+
+        // 5. Create speed-based visual weights (Atmospheric Reentry Effect - AMPLIFIED)
+        const speedRatio = (this.speed - 180) / 70; // 0 to 1
+        const rawSwirl = (Math.sin(this.swirlTimer) + 1) / 2; // 0 to 1
+        // Slightly less aggressive bias so the bright peaks are wider
+        const swirlFactor = Math.pow(rawSwirl, 1.2);
+
+        // Reentry Transition: Exact Hull Color (Base) to Pure Neon White-Yellow (Peak)
+        const sHue = this.hue + (50 - this.hue) * swirlFactor;
+        const sLight = this.lightness + (95 - this.lightness) * swirlFactor;
+        const swirlColor = `hsl(${sHue}, 100%, ${sLight}%)`;
+
+        // Dynamic Line Weights (Notoriety + Pulse Heartbeat AMPLIFIED)
+        const notchedSpeedWeight = 2.0 + speedRatio * 2.0;
+        const pulseWeight = 1.0 + (swirlFactor * 1.0); // 100% extra thickness at peak (Doubled)
+        const baseLineWidth = notchedSpeedWeight * pulseWeight;
+        const frontMultiplier = 1.5;
+
+        // --- DRAW BODY FIRST (Common fill) ---
+        ctx.beginPath();
+        ctx.moveTo(tipX, 0);
+        ctx.lineTo(wingX, -sideY);
+        ctx.lineTo(innerX, -innerY);
+        ctx.lineTo(tailX, 0);
+        ctx.lineTo(innerX, innerY);
+        ctx.lineTo(wingX, sideY);
+        ctx.closePath();
+        ctx.fill();
+
+        // --- DRAW FRONT EDGES (Leading edges) ---
+        ctx.strokeStyle = swirlColor;
+        ctx.lineWidth = baseLineWidth * frontMultiplier;
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.moveTo(wingX, -sideY); // Start at port wingtip
+        ctx.lineTo(tipX, 0); // To nose
+        ctx.lineTo(wingX, sideY); // To starboard wingtip
+        ctx.stroke();
+
+        // --- DRAW REAR EDGES (Trailing sawtooth) ---
+        ctx.lineWidth = baseLineWidth;
+        ctx.beginPath();
+        ctx.moveTo(wingX, sideY); // Start starboard wingtip
+        ctx.lineTo(innerX, innerY);
+        ctx.lineTo(tailX, 0);
+        ctx.lineTo(innerX, -innerY);
+        ctx.lineTo(wingX, -sideY); // Finish port wingtip
+        ctx.stroke();
+
+        // 6. Cockpit Surge Effect (Yellow to White Swirl - Enlarged)
+        // A prominent energy cockpit at the nose tip
+        const cockpitFactor = (Math.sin(this.swirlTimer + Math.PI / 2) + 1) / 2;
+        const cb = Math.floor(255 * (0.4 + cockpitFactor * 0.6));
+        const cockpitColor = `rgb(255, 255, ${cb})`;
+
+        ctx.fillStyle = cockpitColor;
+        ctx.beginPath();
+        ctx.moveTo(tipX - 1, 0);      // Front tip
+        ctx.lineTo(tipX - 16, -5);    // Port side 
+        ctx.lineTo(tipX - 22, 0);     // Rear tip
+        ctx.lineTo(tipX - 16, 5);     // Starboard side
+        ctx.closePath();
+        ctx.fill();
+
+        // 7. High-Performance Thrust Swirl (Fire Gradient) - Scaled by Speed
+
+        // Flicker effect using time - faster enemies flicker more intensely
+        const time = performance.now() * (0.01 + speedRatio * 0.01);
+        const flicker = Math.sin(time + this.x * 0.01) * 0.5 + 0.5;
+
+        // Scale thrust size by speed ratio (larger for faster enemies)
+        const baseThrustSize = this.size * (0.3 + speedRatio * 0.4);
+        const thrustSize = baseThrustSize * (0.8 + flicker * 0.4);
+        const thrustLength = thrustSize * (1.2 + speedRatio * 1.5);
+
+        // High-Performance Thrust Rotation (Inertia effect) - Pronounced
+        const thrustAngleOffset = this.angularVelocity * 4.0; // Increased from 1.5
+
+        ctx.save();
+        // Move to rotation axis (base of thrust at the notch)
+        ctx.translate(-this.size / 3, 0);
+        ctx.rotate(thrustAngleOffset);
+
+        // Create Fire Gradient relative to the new origin
+        const gradient = ctx.createLinearGradient(0, 0, -(thrustLength + this.size / 6), 0);
+
+        // Bright core color based on enemy color hue
+        const hue = 35 * (1 - speedRatio);
+        gradient.addColorStop(0, `hsla(${hue}, 100%, 90%, ${0.8 + flicker * 0.2})`);
+        gradient.addColorStop(0.3, `hsla(${hue}, 100%, 50%, ${0.6 + flicker * 0.3})`);
+        gradient.addColorStop(1, `hsla(${hue}, 100%, 30%, 0)`);
+
+        ctx.beginPath();
+        ctx.fillStyle = gradient;
+
+        // Draw the flame triangle centered at origin
+        ctx.moveTo(0, 0);
+        ctx.lineTo(-this.size / 6, -this.size / 6);
+        ctx.lineTo(-(thrustLength + this.size / 6), 0);
+        ctx.lineTo(-this.size / 6, this.size / 6);
+        ctx.fill();
+        ctx.closePath();
+        ctx.restore();
         ctx.restore();
         return true;
     }
@@ -131,7 +256,16 @@ class Enemy {
         this.x = Math.max(-halfW, Math.min(halfW, this.x));
         this.y = Math.max(-halfH, Math.min(halfH, this.y));
         this.angle = 0;
+        this.angularVelocity = 0;
         this.speed = 180 + Math.random() * 70;
+        this.swirlTimer = 0; // Timer for edge color swirl
+
+        // Update dark orange to saturated red color based on new speed
+        const speedRatio = (this.speed - 180) / 70;
+        const hue = 35 * (1 - speedRatio);
+        const saturation = 100;
+        const lightness = 25 + speedRatio * 25;
+        this.color = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
         this._adjustSpawnIntoView();
     }
 
@@ -168,5 +302,33 @@ class Enemy {
         const fallbackDist = Math.min(Math.max(500, Math.hypot(this.x - this.game.player.x, this.y - this.game.player.y)), 900);
         this.x = this.game.player.x + Math.cos(fallbackAngle) * fallbackDist;
         this.y = this.game.player.y + Math.sin(fallbackAngle) * fallbackDist;
+    }
+
+    explode() {
+        // 15% chance for a "Dud" (boring) explosion for organic variety
+        const isDud = Math.random() < 0.15;
+        const particleCount = isDud ? 8 : 25;
+
+        for (let i = 0; i < particleCount; i++) {
+            let pColor = this.color;
+            let size = null;
+            let speedMult = 1.0;
+            let jitter = 0;
+
+            // Molten debris / Chunks (Sub-explosions)
+            if (!isDud && Math.random() < 0.4) {
+                pColor = `hsl(55, 100%, 80%)`;
+                size = Math.random() * 12 + 8;
+                speedMult = 2.0;
+                jitter = 2;
+            }
+
+            const p = new Particle(this.game, this.x, this.y, pColor, size);
+            p.speedX *= speedMult;
+            p.speedY *= speedMult;
+            p.jitter = jitter;
+
+            this.game.particles.push(p);
+        }
     }
 }
