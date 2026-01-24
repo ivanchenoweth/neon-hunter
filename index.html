@@ -170,6 +170,19 @@
             min-width: 50px;
             text-align: center;
         }
+            .version-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, rgba(0,255,136,0.2), rgba(0,200,100,0.1));
+            border: 1px solid rgba(0,255,136,0.3);
+            color: #00ff88;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+            text-shadow: 0 0 10px rgba(0,255,136,0.5);
+        }
     </style>
 </head>
 
@@ -177,6 +190,7 @@
     <div id="inputModeOverlay" class="input-overlay">
         <div class="input-card">
             <h2>Select control mode</h2>
+            <span id="version-badge" class="version-badge">v3.0-frost-ranger</span>
             <div class="zoom-controls">
                 <label>Zoom:</label>
                 <button id="btnZoomOut">-</button>
