@@ -3,7 +3,14 @@ class Enemy {
         this.game = game;
         this.size = 50;
         this.speed = 180 + Math.random() * 70;
-        this.color = '#ff4444';
+
+        // Dark Orange to Saturated Red gradient based on speed
+        // Speed range: 180 to 250 (delta 70)
+        const speedRatio = (this.speed - 180) / 70;
+        const hue = 35 * (1 - speedRatio);        // 35 (Orange) to 0 (Red)
+        const saturation = 100;                    // Always saturated
+        const lightness = 25 + speedRatio * 25;    // 25% (Dark) to 50% (Bright)
+        this.color = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
         this.markedForDeletion = false;
 
         // Spawn somewhere around the player but at a distance
@@ -23,22 +30,7 @@ class Enemy {
         // Ensure spawned enemy is not too far outside current camera view
         this._adjustSpawnIntoView();
 
-        if (!Enemy.spriteCanvas) {
-            Enemy.spriteCanvas = document.createElement('canvas');
-            const size = this.size;
-            Enemy.spriteCanvas.width = size * 1.5;
-            Enemy.spriteCanvas.height = size * 1.5;
-            const sCtx = Enemy.spriteCanvas.getContext('2d');
-            sCtx.translate(size * 0.75, size * 0.75);
-            sCtx.fillStyle = this.color;
-            sCtx.beginPath();
-            sCtx.moveTo(size / 2, 0);
-            sCtx.lineTo(-size / 2, -size / 2.5);
-            sCtx.lineTo(-size / 3, 0);
-            sCtx.lineTo(-size / 2, size / 2.5);
-            sCtx.fill();
-            sCtx.closePath();
-        }
+        // Sprite rendering is now dynamic per-enemy based on color/speed
     }
 
     /**
@@ -94,8 +86,17 @@ class Enemy {
             }
         }
 
-        // Update angle
+        // Update angle and angular velocity for visual effects
+        const lastAngle = this.angle;
         this.angle = Math.atan2(dy, dx);
+
+        // Handle angular wrap-around for velocity calculation
+        let angleDiff = this.angle - lastAngle;
+        if (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+        if (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+
+        // Smooth the angular velocity
+        this.angularVelocity = this.angularVelocity * 0.8 + angleDiff * 0.2;
     }
 
     // Deprecated for multiplayer readiness
@@ -108,12 +109,68 @@ class Enemy {
         ctx.translate(this.x, this.y);
         ctx.rotate(this.angle);
 
-        ctx.drawImage(
-            Enemy.spriteCanvas,
-            -this.size * 0.75,
-            -this.size * 0.75
-        );
+        // 5. Draw Enemy Body (B-2 Spirit Style Flying Wing)
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
 
+        // Iconic B-2 Flying Wing with sawtooth trailing edge
+        // Tip (Nose)
+        ctx.moveTo(this.size / 2, 0);
+
+        // Leading edge to right wingtip
+        ctx.lineTo(-this.size / 4, -this.size / 1.2);
+
+        // Sawtooth trailing edge (W-shape)
+        ctx.lineTo(-this.size / 8, -this.size / 3);
+        ctx.lineTo(-this.size / 3, 0); // Center notch
+        ctx.lineTo(-this.size / 8, this.size / 3);
+
+        // Trailing edge to left wingtip
+        ctx.lineTo(-this.size / 4, this.size / 1.2);
+
+        ctx.closePath();
+        ctx.fill();
+
+        // 6. High-Performance Thrust Swirl (Fire Gradient) - Scaled by Speed
+        const speedRatio = (this.speed - 180) / 70; // 0 to 1
+
+        // Flicker effect using time - faster enemies flicker more intensely
+        const time = performance.now() * (0.01 + speedRatio * 0.01);
+        const flicker = Math.sin(time + this.x * 0.01) * 0.5 + 0.5;
+
+        // Scale thrust size by speed ratio (larger for faster enemies)
+        const baseThrustSize = this.size * (0.3 + speedRatio * 0.4);
+        const thrustSize = baseThrustSize * (0.8 + flicker * 0.4);
+        const thrustLength = thrustSize * (1.2 + speedRatio * 1.5);
+
+        // High-Performance Thrust Rotation (Inertia effect) - Pronounced
+        const thrustAngleOffset = this.angularVelocity * 4.0; // Increased from 1.5
+
+        ctx.save();
+        // Move to rotation axis (base of thrust at the notch)
+        ctx.translate(-this.size / 3, 0);
+        ctx.rotate(thrustAngleOffset);
+
+        // Create Fire Gradient relative to the new origin
+        const gradient = ctx.createLinearGradient(0, 0, -(thrustLength + this.size / 6), 0);
+
+        // Bright core color based on enemy color hue
+        const hue = 35 * (1 - speedRatio);
+        gradient.addColorStop(0, `hsla(${hue}, 100%, 90%, ${0.8 + flicker * 0.2})`);
+        gradient.addColorStop(0.3, `hsla(${hue}, 100%, 50%, ${0.6 + flicker * 0.3})`);
+        gradient.addColorStop(1, `hsla(${hue}, 100%, 30%, 0)`);
+
+        ctx.beginPath();
+        ctx.fillStyle = gradient;
+
+        // Draw the flame triangle centered at origin
+        ctx.moveTo(0, 0);
+        ctx.lineTo(-this.size / 6, -this.size / 6);
+        ctx.lineTo(-(thrustLength + this.size / 6), 0);
+        ctx.lineTo(-this.size / 6, this.size / 6);
+        ctx.fill();
+        ctx.closePath();
+        ctx.restore();
         ctx.restore();
         return true;
     }
@@ -131,7 +188,15 @@ class Enemy {
         this.x = Math.max(-halfW, Math.min(halfW, this.x));
         this.y = Math.max(-halfH, Math.min(halfH, this.y));
         this.angle = 0;
+        this.angularVelocity = 0;
         this.speed = 180 + Math.random() * 70;
+
+        // Update dark orange to saturated red color based on new speed
+        const speedRatio = (this.speed - 180) / 70;
+        const hue = 35 * (1 - speedRatio);
+        const saturation = 100;
+        const lightness = 25 + speedRatio * 25;
+        this.color = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
         this._adjustSpawnIntoView();
     }
 

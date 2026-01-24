@@ -9,7 +9,8 @@ class InputHandler {
             j: false,
             l: false,
             k: false,
-            p: false
+            p: false,
+            ' ': false
         };
 
         // Respect input mode: default to 'keyboard' if not set
@@ -39,14 +40,14 @@ class InputHandler {
     }
 
     handleKeyDown(e) {
-        const key = e.key.toLowerCase();
+        const key = e.key === ' ' ? ' ' : e.key.toLowerCase();
         if (this.keys.hasOwnProperty(key)) {
             this.keys[key] = true;
         }
     }
 
     handleKeyUp(e) {
-        const key = e.key.toLowerCase();
+        const key = e.key === ' ' ? ' ' : e.key.toLowerCase();
         if (this.keys.hasOwnProperty(key)) {
             this.keys[key] = false;
         }
