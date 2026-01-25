@@ -91,8 +91,8 @@ class Game {
         this.maxLives = 5;  // Track max lives for speed calculation
         this.baseSpeed = 175;  // Base player speed
 
-        // Pause button bounds
-        this.pauseBtnBounds = { x: 0, y: 0, w: 150, h: 60 };
+        // Pause button bounds (Top Right)
+        this.pauseBtnBounds = { x: this.width - 60, y: 20, w: 40, h: 40 };
 
         // Initial Zoom
         window.zoomLevel = window.zoomLevel || 1.0;
@@ -143,6 +143,9 @@ class Game {
         this.camera.width = this.width;
         this.camera.height = this.height;
         this.camera.zoom = window.zoomLevel * 2.0; // Apply standard scaling multiplier
+
+        // Update UI positions
+        this.pauseBtnBounds.x = this.width - 60;
     }
 
     tryEnterFullscreen() {
@@ -299,11 +302,23 @@ class Game {
     }
 
     handleCanvasClick(e) {
-        if (this.gameState === this.states.PLAYING) return;
-
         const rect = this.canvas.getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
+
+        if (this.gameState === this.states.PLAYING || this.gameState === this.states.PAUSED) {
+            // Check Pause Button
+            const pb = this.pauseBtnBounds;
+            if (mouseX >= pb.x && mouseX <= pb.x + pb.w && mouseY >= pb.y && mouseY <= pb.y + pb.h) {
+                // Same logic as Spacebar: Go to Menu (Pause)
+                this.gameState = this.states.INITIAL;
+                this.menuCooldown = 500;
+                this.sound.playCollect();
+                return;
+            }
+        }
+
+        if (this.gameState === this.states.PLAYING) return;
 
         if (this.gameState === this.states.INITIAL) {
             // Zoom Controls
@@ -1032,6 +1047,19 @@ class Game {
         // Health Indicator
         this.ctx.fillStyle = '#ff4444';
         this.ctx.fillText(`Lives: ${'❤️'.repeat(this.lives)}`, 20, 150);
+
+        // Pause Button (Visible in Playing/Paused)
+        if (this.gameState === this.states.PLAYING || this.gameState === this.states.PAUSED) {
+            const pb = this.pauseBtnBounds;
+            this.ctx.strokeStyle = '#ffffff';
+            this.ctx.lineWidth = 2;
+            this.ctx.strokeRect(pb.x, pb.y, pb.w, pb.h);
+
+            // Draw Pause Icon (||)
+            this.ctx.fillStyle = '#ffffff';
+            this.ctx.fillRect(pb.x + 12, pb.y + 10, 6, 20);
+            this.ctx.fillRect(pb.x + 22, pb.y + 10, 6, 20);
+        }
 
         // UI Screens
         if (this.gameState === this.states.INITIAL) {
