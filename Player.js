@@ -1,10 +1,10 @@
 class Player {
     constructor(game) {
         this.game = game;
-        this.radius = 20;
+        this.radius = 10;
         this.x = 0;
         this.y = 0;
-        this.speed = 350;
+        this.speed = 175;
         this.color = '#00ff88';
         this.glow = '#00ff88';
         this.trailTimer = 0;
@@ -92,12 +92,12 @@ class Player {
         // Draw directional arrow (triangle) outside the circle with curved base
         const arrowLength = this.radius * 0.45;
         const arrowWidth = this.radius * 1.15;
-        
+
         // Update and check blink timer
         if (this.arrowBlinkTimer > 0) {
             this.arrowBlinkTimer -= 16; // Assuming ~60fps
         }
-        
+
         // Calculate arrow color based on blink effect
         let arrowColor = '#ff00ff'; // Default magenta
         if (this.arrowBlinkTimer > 0) {
@@ -110,30 +110,30 @@ class Player {
             const b = Math.floor(0);
             arrowColor = `rgb(${r}, ${g}, ${b})`;
         }
-        
+
         // Calculate the fire direction angle
         const fireAngle = Math.atan2(this.fireDirection.y, this.fireDirection.x);
-        
+
         // Calculate the angular offset for symmetric placement on circle
         const angleOffset = Math.atan2(arrowWidth, this.radius);
-        
+
         // Position arrow at the circumference of the circle
         const baseOffsetX = this.x + this.fireDirection.x * this.radius;
         const baseOffsetY = this.y + this.fireDirection.y * this.radius;
-        
+
         // Calculate arrow point (tip) - extends outward from the circle
         const tipX = baseOffsetX + this.fireDirection.x * arrowLength;
         const tipY = baseOffsetY + this.fireDirection.y * arrowLength;
-        
+
         // Base corners positioned symmetrically on the circle
         const baseAngle1 = fireAngle + angleOffset;
         const baseAngle2 = fireAngle - angleOffset;
-        
+
         const baseX1 = this.x + Math.cos(baseAngle1) * this.radius;
         const baseY1 = this.y + Math.sin(baseAngle1) * this.radius;
         const baseX2 = this.x + Math.cos(baseAngle2) * this.radius;
         const baseY2 = this.y + Math.sin(baseAngle2) * this.radius;
-        
+
         // Draw shape with curved base following the player circle
         ctx.fillStyle = arrowColor;
         ctx.beginPath();
@@ -153,7 +153,7 @@ class Player {
         const dx = targetX - this.x;
         const dy = targetY - this.y;
         const length = Math.sqrt(dx * dx + dy * dy);
-        
+
         if (length > 0) {
             this.fireDirection.x = dx / length;
             this.fireDirection.y = dy / length;

@@ -29,7 +29,7 @@ class Game {
         this.frameCount = 0;
         this.fpsTimer = 0;
         // monitor refresh rate
-        this.fpsLimit = 60; // 60 FPS limit for smoothness
+        this.fpsLimit = 120; // 120 FPS limit for smoothness
         this.frameInterval = 1000 / this.fpsLimit;
 
         this.shotTimer = 0;
@@ -89,19 +89,33 @@ class Game {
         this.gameState = this.states.INITIAL;
         this.lives = 5;
         this.maxLives = 5;  // Track max lives for speed calculation
-        this.baseSpeed = 350;  // Base player speed
+        this.baseSpeed = 175;  // Base player speed
 
         // Pause button bounds
         this.pauseBtnBounds = { x: 0, y: 0, w: 150, h: 60 };
 
+        // Initial Zoom
+        window.zoomLevel = window.zoomLevel || 1.0;
+
         // Button bounds for canvas interaction
         this.btnBounds = {
-            start: { x: 0, y: 0, w: 200, h: 60 },
-            restart: { x: 0, y: 0, w: 200, h: 60 }
+            restart: { x: 0, y: 0, w: 200, h: 60 },
+            mainMenu: { x: 0, y: 0, w: 200, h: 60 },
+            // Start Screen Buttons
+            zoomOut: { x: 0, y: 0, w: 50, h: 40 },
+            zoomIn: { x: 0, y: 0, w: 50, h: 40 },
+            modeTouch: { x: 0, y: 0, w: 220, h: 50 },
+            modeKeyboard: { x: 0, y: 0, w: 220, h: 50 },
+            modeKeyboardFire: { x: 0, y: 0, w: 220, h: 50 }
         };
 
         // Canvas Interaction
         this.canvas.addEventListener('mousedown', (e) => this.handleCanvasClick(e));
+
+        // Menu Navigation State
+        this.menuSelection = 2; // Default to 'Touch' (index 2) on start
+        this.menuCooldown = 0;
+        this.sessionActive = false;
 
         this.lastTime = 0;
         this.loop = this.loop.bind(this);
@@ -128,6 +142,17 @@ class Game {
 
         this.camera.width = this.width;
         this.camera.height = this.height;
+        this.camera.zoom = window.zoomLevel * 2.0; // Apply standard scaling multiplier
+    }
+
+    tryEnterFullscreen() {
+        if (!document.fullscreenElement) {
+            const canvas = this.canvas;
+            const rfs = canvas.requestFullscreen || canvas.webkitRequestFullscreen || canvas.mozRequestFullScreen || canvas.msRequestFullscreen;
+            if (rfs) {
+                rfs.call(canvas).catch(err => console.log('Fullscreen denied:', err));
+            }
+        }
     }
 
     updateScore() {
@@ -230,6 +255,7 @@ class Game {
     }
 
     startGame() {
+        this.sessionActive = true;
         this.gameState = this.states.PLAYING;
         this.score = 0;
         this.coins = 0;
@@ -245,6 +271,9 @@ class Game {
         // Hide overlays if present
         if (this.startScreen && this.startScreen.classList) this.startScreen.classList.add('hidden');
         if (this.gameOverScreen && this.gameOverScreen.classList) this.gameOverScreen.classList.add('hidden');
+
+        // Anti-bounce: consume input
+        this.input.keys.space = false;
     }
 
     takeDamage() {
@@ -265,6 +294,7 @@ class Game {
     }
 
     gameOver() {
+        this.sessionActive = false;
         this.gameState = this.states.GAME_OVER;
     }
 
@@ -276,10 +306,59 @@ class Game {
         const mouseY = e.clientY - rect.top;
 
         if (this.gameState === this.states.INITIAL) {
-            const b = this.btnBounds.start;
-            if (mouseX >= b.x && mouseX <= b.x + b.w && mouseY >= b.y && mouseY <= b.y + b.h) {
-                this.startGame();
-                this.sound.playCollect();
+            // Zoom Controls
+            const bZoomOut = this.btnBounds.zoomOut;
+            if (mouseX >= bZoomOut.x && mouseX <= bZoomOut.x + bZoomOut.w && mouseY >= bZoomOut.y && mouseY <= bZoomOut.y + bZoomOut.h) {
+                if (window.zoomLevel > 0.5) {
+                    window.zoomLevel = parseFloat((window.zoomLevel - 0.1).toFixed(1));
+                    this.camera.zoom = window.zoomLevel * 2.0;
+                    this.triggerExplosion(bZoomOut.x + bZoomOut.w / 2, bZoomOut.y + bZoomOut.h / 2, '#ff8500', 10);
+                }
+                return;
+            }
+
+            const bZoomIn = this.btnBounds.zoomIn;
+            if (mouseX >= bZoomIn.x && mouseX <= bZoomIn.x + bZoomIn.w && mouseY >= bZoomIn.y && mouseY <= bZoomIn.y + bZoomIn.h) {
+                if (window.zoomLevel < 2.0) {
+                    window.zoomLevel = parseFloat((window.zoomLevel + 0.1).toFixed(1));
+                    this.camera.zoom = window.zoomLevel * 2.0;
+                    this.triggerExplosion(bZoomIn.x + bZoomIn.w / 2, bZoomIn.y + bZoomIn.h / 2, '#ff8500', 10);
+                }
+                return;
+            }
+
+            // Mode Selection
+            const modes = [
+                { bounds: this.btnBounds.modeTouch, mode: 'touch', color: '#00ff88' },
+                { bounds: this.btnBounds.modeKeyboard, mode: 'keyboard', color: '#00d4ff' },
+                { bounds: this.btnBounds.modeKeyboardFire, mode: 'keyboardFire', color: '#ff00ff' }
+            ];
+
+            for (let m of modes) {
+                const b = m.bounds;
+                if (mouseX >= b.x && mouseX <= b.x + b.w && mouseY >= b.y && mouseY <= b.y + b.h) {
+                    // Trigger Explosion
+                    this.triggerExplosion(b.x + b.w / 2, b.y + b.h / 2, m.color, 30);
+
+                    // Set Mode
+                    window.inputMode = m.mode;
+                    window.dispatchEvent(new Event('inputModeChanged'));
+
+                    // Enter Fullscreen
+                    const canvas = this.canvas;
+                    const rfs = canvas.requestFullscreen || canvas.webkitRequestFullscreen || canvas.mozRequestFullScreen || canvas.msRequestFullscreen;
+                    if (rfs) {
+                        rfs.call(canvas).catch(err => console.log('Fullscreen denied:', err));
+                    }
+
+                    // Start Game or Resume
+                    if (this.sessionActive) {
+                        this.gameState = this.states.PLAYING;
+                    } else {
+                        this.startGame();
+                    }
+                    return;
+                }
             }
         } else if (this.gameState === this.states.GAME_OVER) {
             const b = this.btnBounds.restart;
@@ -287,6 +366,27 @@ class Game {
                 this.startGame();
                 this.sound.playCollect();
             }
+
+            const bMenu = this.btnBounds.mainMenu;
+            if (mouseX >= bMenu.x && mouseX <= bMenu.x + bMenu.w && mouseY >= bMenu.y && mouseY <= bMenu.y + bMenu.h) {
+                this.gameState = this.states.INITIAL; // Go back to start screen
+                this.sound.playCollect();
+            }
+        }
+    }
+
+    triggerExplosion(screenX, screenY, color = '#00ff88', count = 12) {
+        // Convert screen to world for particle system
+        const worldX = (screenX / this.camera.zoom) + this.camera.x;
+        const worldY = (screenY / this.camera.zoom) + this.camera.y;
+        this.createExplosion(worldX, worldY, color, count);
+    }
+
+    createExplosion(x, y, color, count = 12) {
+        this.sound.playExplosion();
+        for (let i = 0; i < count; i++) {
+            const size = Math.random() * 10 + 10;
+            this.particles.push(this.particlePool.get(this, x, y, color, size));
         }
     }
 
@@ -297,34 +397,95 @@ class Game {
 
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
+        const cx = this.width / 2;
+        const cy = this.height / 2;
 
+        // Title
         ctx.fillStyle = '#00ff88';
         ctx.font = 'bold 60px "Outfit", sans-serif';
         ctx.shadowBlur = 20;
         ctx.shadowColor = '#00ff88';
-        ctx.fillText('NEON HUNTER', this.width / 2, this.height / 2 - 100);
+        ctx.fillText('NEON HUNTER', cx, cy - 200);
 
-        ctx.font = '20px "Outfit", sans-serif';
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+        // Version Badge
         ctx.shadowBlur = 0;
-        ctx.fillText('Survive as long as possible', this.width / 2, this.height / 2 - 40);
+        ctx.font = 'bold 16px "Outfit", sans-serif';
+        ctx.fillStyle = '#00ff88';
+        ctx.fillText('v3.0-frost-ranger', cx, cy - 150);
 
-        const b = this.btnBounds.start;
-        b.x = this.width / 2 - b.w / 2;
-        b.y = this.height / 2 + 20;
+        // Zoom Controls
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        ctx.font = 'bold 20px "Outfit", sans-serif';
+        // ctx.fillText('Zoom:', cx - 100, cy - 100);
 
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
-        ctx.strokeStyle = '#00ff88';
-        ctx.lineWidth = 2;
+        // Zoom Out Button
+        const bZoomOut = this.btnBounds.zoomOut;
+        bZoomOut.x = cx - 40 - bZoomOut.w;
+        bZoomOut.y = cy - 120;
+        this.drawButton(ctx, bZoomOut, '-', '#ff8500', this.menuSelection === 0);
+
+        // Zoom Level Display
+        ctx.fillStyle = '#00ff88';
+        ctx.font = 'bold 20px "Outfit", sans-serif';
+        ctx.fillText(`${window.zoomLevel.toFixed(1)}x`, cx, cy - 100);
+
+        // Zoom In Button
+        const bZoomIn = this.btnBounds.zoomIn;
+        bZoomIn.x = cx + 40;
+        bZoomIn.y = cy - 120;
+        this.drawButton(ctx, bZoomIn, '+', '#ff8500', this.menuSelection === 1);
+
+        // Instruction
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+        ctx.font = '20px "Outfit", sans-serif';
+        ctx.fillText('Choose how you want to play:', cx, cy - 40);
+
+        // Mode Buttons
+        const bTouch = this.btnBounds.modeTouch;
+        bTouch.x = cx - bTouch.w / 2;
+        bTouch.y = cy;
+        this.drawButton(ctx, bTouch, 'Touch Joysticks', '#00ff88', this.menuSelection === 2);
+
+        const bKeyboard = this.btnBounds.modeKeyboard;
+        bKeyboard.x = cx - bKeyboard.w / 2;
+        bKeyboard.y = cy + 70;
+        this.drawButton(ctx, bKeyboard, 'WASD + Mouse', '#00d4ff', this.menuSelection === 3);
+
+        const bKeyboardFire = this.btnBounds.modeKeyboardFire;
+        bKeyboardFire.x = cx - bKeyboardFire.w / 2;
+        bKeyboardFire.y = cy + 140;
+        this.drawButton(ctx, bKeyboardFire, 'WASD + IJLK', '#ff00ff', this.menuSelection === 4);
+
+        ctx.restore();
+    }
+
+    drawButton(ctx, bounds, text, color, highlight = false) {
+        ctx.save();
+        if (highlight) {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.lineWidth = 4;
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = color;
+        } else {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+            ctx.lineWidth = 2;
+            ctx.shadowBlur = 0;
+        }
+
+        ctx.strokeStyle = color;
         ctx.beginPath();
-        if (ctx.roundRect) ctx.roundRect(b.x, b.y, b.w, b.h, 30);
-        else ctx.rect(b.x, b.y, b.w, b.h);
+        if (ctx.roundRect) ctx.roundRect(bounds.x, bounds.y, bounds.w, bounds.h, 15);
+        else ctx.rect(bounds.x, bounds.y, bounds.w, bounds.h);
         ctx.fill();
         ctx.stroke();
 
-        ctx.fillStyle = '#00ff88';
-        ctx.font = 'bold 24px "Outfit", sans-serif';
-        ctx.fillText('START GAME', this.width / 2, b.y + b.h / 2);
+        ctx.fillStyle = color;
+        ctx.font = 'bold 18px "Outfit", sans-serif';
+        if (!highlight) {
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = color;
+        }
+        ctx.fillText(text, bounds.x + bounds.w / 2, bounds.y + bounds.h / 2);
         ctx.restore();
     }
 
@@ -352,18 +513,15 @@ class Game {
         b.x = this.width / 2 - b.w / 2;
         b.y = this.height / 2 + 80;
 
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
-        ctx.strokeStyle = '#00ff88';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        if (ctx.roundRect) ctx.roundRect(b.x, b.y, b.w, b.h, 30);
-        else ctx.rect(b.x, b.y, b.w, b.h);
-        ctx.fill();
-        ctx.stroke();
+        this.drawButton(ctx, b, 'TRY AGAIN', '#00ff88', this.menuSelection === 0);
 
-        ctx.fillStyle = '#00ff88';
-        ctx.font = 'bold 24px "Outfit", sans-serif';
-        ctx.fillText('TRY AGAIN', this.width / 2, b.y + b.h / 2);
+        // Main Menu Button
+        const bMenu = this.btnBounds.mainMenu;
+        bMenu.x = this.width / 2 - bMenu.w / 2;
+        bMenu.y = b.y + 80;
+
+        this.drawButton(ctx, bMenu, 'MAIN MENU', '#00d4ff', this.menuSelection === 1);
+
         ctx.restore();
     }
 
@@ -515,6 +673,118 @@ class Game {
         }
     }
 
+    updateMenu(deltaTime) {
+        if (this.menuCooldown > 0) {
+            this.menuCooldown -= deltaTime;
+            if (this.menuCooldown < 0) this.menuCooldown = 0;
+        }
+
+        // Standardize Input
+        const up = this.input.keys.w || this.input.keys.arrowup || (this.input.joystickLeft && this.input.joystickLeft.y < -0.5);
+        const down = this.input.keys.s || this.input.keys.arrowdown || (this.input.joystickLeft && this.input.joystickLeft.y > 0.5);
+        const left = this.input.keys.a || this.input.keys.arrowleft || (this.input.joystickLeft && this.input.joystickLeft.x < -0.5);
+        const right = this.input.keys.d || this.input.keys.arrowright || (this.input.joystickLeft && this.input.joystickLeft.x > 0.5);
+        const select = this.input.keys.space;
+
+        if (up || down || left || right || select) {
+            // this.tryEnterFullscreen(); // Reverted as per user request
+        }
+
+        if (this.gameState === this.states.INITIAL) {
+            // Indices: 0:ZoomOut, 1:ZoomIn, 2:Touch, 3:WASD+Mouse, 4:WASD+IJLK
+            if (this.menuCooldown === 0) {
+                if (up) {
+                    if (this.menuSelection > 1) this.menuSelection--; // Move up list
+                    else if (this.menuSelection <= 1) { /* Stay in row 0 */ }
+                    // Logic fix: 2->1? But 2 is centered. 2->0/1 logic:
+                    // If at 2, up goes to 0 or 1? Let's say 0 default or keep previous column? 
+                    // Simple stack: 0,1 are top row. 2 is below.
+                    if (this.menuSelection === 2) this.menuSelection = 0;
+                    this.menuCooldown = 200;
+                    this.sound.playCollect();
+                } else if (down) {
+                    if (this.menuSelection < 4) {
+                        if (this.menuSelection < 2) this.menuSelection = 2; // From Zoom to Touch
+                        else this.menuSelection++;
+                        this.menuCooldown = 200;
+                        this.sound.playCollect();
+                    }
+                } else if (left) {
+                    if (this.menuSelection === 1) { this.menuSelection = 0; this.menuCooldown = 200; this.sound.playCollect(); }
+                } else if (right) {
+                    if (this.menuSelection === 0) { this.menuSelection = 1; this.menuCooldown = 200; this.sound.playCollect(); }
+                }
+            }
+
+            if (select && this.menuCooldown === 0) {
+                this.menuCooldown = 300; // Longer cooldown after action
+                if (this.menuSelection === 0) {
+                    // Zoom Out
+                    if (window.zoomLevel > 0.5) {
+                        window.zoomLevel = parseFloat((window.zoomLevel - 0.1).toFixed(1));
+                        this.camera.zoom = window.zoomLevel * 2.0;
+                        const b = this.btnBounds.zoomOut;
+                        this.triggerExplosion(b.x + b.w / 2, b.y + b.h / 2, '#ff8500', 10);
+                    }
+                } else if (this.menuSelection === 1) {
+                    // Zoom In
+                    if (window.zoomLevel < 2.0) {
+                        window.zoomLevel = parseFloat((window.zoomLevel + 0.1).toFixed(1));
+                        this.camera.zoom = window.zoomLevel * 2.0;
+                        const b = this.btnBounds.zoomIn;
+                        this.triggerExplosion(b.x + b.w / 2, b.y + b.h / 2, '#ff8500', 10);
+                    }
+                } else {
+                    // Modes
+                    let mode = '', bounds = null, color = '';
+                    if (this.menuSelection === 2) { mode = 'touch'; bounds = this.btnBounds.modeTouch; color = '#00ff88'; }
+                    if (this.menuSelection === 3) { mode = 'keyboard'; bounds = this.btnBounds.modeKeyboard; color = '#00d4ff'; }
+                    if (this.menuSelection === 4) { mode = 'keyboardFire'; bounds = this.btnBounds.modeKeyboardFire; color = '#ff00ff'; }
+
+                    if (mode) {
+                        this.triggerExplosion(bounds.x + bounds.w / 2, bounds.y + bounds.h / 2, color, 30);
+                        window.inputMode = mode;
+                        window.dispatchEvent(new Event('inputModeChanged'));
+
+                        const canvas = this.canvas;
+                        const rfs = canvas.requestFullscreen || canvas.webkitRequestFullscreen || canvas.mozRequestFullScreen || canvas.msRequestFullscreen;
+                        if (rfs) rfs.call(canvas).catch(() => { });
+
+                        if (this.sessionActive) {
+                            this.gameState = this.states.PLAYING;
+                        } else {
+                            this.startGame();
+                        }
+                        // Anti-bounce: consume input
+                        this.input.keys.space = false;
+                    }
+                }
+            }
+
+        } else if (this.gameState === this.states.GAME_OVER) {
+            // Indices: 0: Try Again, 1: Main Menu
+            if (this.menuCooldown === 0) {
+                if (up || down) {
+                    this.menuSelection = this.menuSelection === 0 ? 1 : 0;
+                    this.menuCooldown = 200;
+                    this.sound.playCollect();
+                }
+            }
+
+            if (select && this.menuCooldown === 0) {
+                this.menuCooldown = 300;
+                if (this.menuSelection === 0) {
+                    this.startGame();
+                    this.sound.playCollect();
+                } else {
+                    this.gameState = this.states.INITIAL;
+                    this.menuSelection = 2; // Reset to Touch/first mode option
+                    this.sound.playCollect();
+                }
+            }
+        }
+    }
+
     cleanupEntities() {
         // Enemies
         for (let i = this.enemies.length - 1; i >= 0; i--) {
@@ -586,11 +856,7 @@ class Game {
                         bullet.markedForDeletion = true;
                         this.score += 10;
                         this.updateScore();
-                        this.sound.playExplosion();
-                        for (let i = 0; i < 12; i++) {
-                            const size = Math.random() * 20 + 20;
-                            this.particles.push(this.particlePool.get(this, enemy.x, enemy.y, enemy.color, size));
-                        }
+                        this.createExplosion(enemy.x, enemy.y, enemy.color);
                     }
                 }
             });
@@ -642,6 +908,19 @@ class Game {
         } else if (this.input.keys.p && this.gameState === this.states.PAUSED) {
             this.gameState = this.states.PLAYING;
             this.input.keys.p = false; // Consume the key press
+        }
+
+        // Spacebar to Main Menu (Pause & Exit) from Playing/Paused
+        if ((this.gameState === this.states.PLAYING || this.gameState === this.states.PAUSED) && this.input.keys.space) {
+            this.gameState = this.states.INITIAL;
+            this.menuCooldown = 500; // Prevent immediate selection
+            this.sound.playCollect();
+            this.input.keys.space = false; // Consume input
+            return; // Skip rest of update
+        }
+
+        if (this.gameState === this.states.INITIAL || this.gameState === this.states.GAME_OVER) {
+            this.updateMenu(deltaTime);
         }
 
         const movementInfo = this.updateState(deltaTime);

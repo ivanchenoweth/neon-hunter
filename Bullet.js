@@ -3,8 +3,8 @@ class Bullet {
         this.game = game;
         this.x = x;
         this.y = y;
-        this.speed = 1000;
-        this.radius = 3;
+        this.speed = 600;
+        this.radius = 1.5;
         this.color = '#ffff00';
         this.markedForDeletion = false;
 
@@ -17,11 +17,11 @@ class Bullet {
 
         if (!Bullet.spriteCanvas) {
             Bullet.spriteCanvas = document.createElement('canvas');
-            Bullet.spriteCanvas.width = 40;
-            Bullet.spriteCanvas.height = 10;
+            Bullet.spriteCanvas.width = 20;
+            Bullet.spriteCanvas.height = 5;
             const sCtx = Bullet.spriteCanvas.getContext('2d');
             sCtx.fillStyle = this.color;
-            sCtx.fillRect(5, 3, 30, 4);
+            sCtx.fillRect(2.5, 1.5, 15, 2);
         }
     }
 
@@ -48,7 +48,7 @@ class Bullet {
         ctx.save();
         ctx.translate(this.x, this.y);
         ctx.rotate(this.angle);
-        ctx.drawImage(Bullet.spriteCanvas, -20, -5);
+        ctx.drawImage(Bullet.spriteCanvas, -10, -2.5);
         ctx.restore();
     }
 
@@ -56,7 +56,7 @@ class Bullet {
         this.game = game;
         this.x = x;
         this.y = y;
-        this.speed = 1000;
+        this.speed = 600;
         this.markedForDeletion = false;
 
         const centerX = this.game.width / 2;

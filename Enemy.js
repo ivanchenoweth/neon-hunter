@@ -1,8 +1,8 @@
 class Enemy {
     constructor(game) {
         this.game = game;
-        this.size = 50;
-        this.speed = 180 + Math.random() * 70;
+        this.size = 25;
+        this.speed = 90 + Math.random() * 35;
         this.color = '#ff4444';
         this.markedForDeletion = false;
 
@@ -131,7 +131,7 @@ class Enemy {
         this.x = Math.max(-halfW, Math.min(halfW, this.x));
         this.y = Math.max(-halfH, Math.min(halfH, this.y));
         this.angle = 0;
-        this.speed = 180 + Math.random() * 70;
+        this.speed = 90 + Math.random() * 35;
         this._adjustSpawnIntoView();
     }
 

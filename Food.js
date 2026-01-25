@@ -7,7 +7,7 @@ class Food {
     reset() {
         this.x = (Math.random() - 0.5) * this.game.worldWidth;
         this.y = (Math.random() - 0.5) * this.game.worldHeight;
-        this.radius = 8 + Math.random() * 8; // Random size
+        this.radius = 4 + Math.random() * 4; // Random size
         this.color = `hsl(${Math.random() * 360}, 100%, 70%)`;
         this.markedForDeletion = false;
 

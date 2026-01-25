@@ -9,7 +9,10 @@ class InputHandler {
             j: false,
             l: false,
             k: false,
-            p: false
+            p: false,
+            space: false,
+            arrowleft: false,
+            arrowdown: false
         };
 
         // Respect input mode: default to 'keyboard' if not set
@@ -43,12 +46,18 @@ class InputHandler {
         if (this.keys.hasOwnProperty(key)) {
             this.keys[key] = true;
         }
+        if (e.code === 'Space') {
+            this.keys.space = true;
+        }
     }
 
     handleKeyUp(e) {
         const key = e.key.toLowerCase();
         if (this.keys.hasOwnProperty(key)) {
             this.keys[key] = false;
+        }
+        if (e.code === 'Space') {
+            this.keys.space = false;
         }
     }
 
