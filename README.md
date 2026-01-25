@@ -1,101 +1,116 @@
 # Neon Hunter
 
-**Neon Hunter** es un vibrante juego tipo arcade de supervivencia y acción. El objetivo principal es **controlar a un cazador neon y sobrevivir** el mayor tiempo posible en un entorno hostil mientras recolectas monedas (coins) y eliminas oleadas de enemigos.
+**Neon Hunter** is a vibrant arcade-style survival and action game. The main objective is to **control a neon hunter and survive** as long as possible in a hostile environment while collecting coins and eliminating waves of enemies.
 
-Diseñado con una arquitectura modular de alto rendimiento, el juego ofrece una experiencia fluida (60 FPS) y está optimizado desde sus cimientos para una futura transición a multijugador masivo.
+Designed with a high-performance modular architecture, the game offers a smooth experience (60 FPS) and is optimized from the ground up for a future transition to massive multiplayer.
 
-## 🚀 Arquitectura y Optimizaciones
+## 🚀 Architecture and Optimizations
 
-El motor del juego ha sido diseñado siguiendo principios avanzados de desarrollo de videojuegos para garantizar fluidez (60 FPS) y escalabilidad.
+The game engine has been designed following advanced game development principles to ensure fluidity (60 FPS) and scalability.
 
-### 1. Separación de Estado y Renderizado (Multiplayer Ready)
+### 1. State and Rendering Separation (Multiplayer Ready)
 
-A diferencia de los juegos sencillos donde la lógica y el dibujo están mezclados, Neon Hunter separa estas responsabilidades:
+Unlike simple games where logic and drawing are mixed, Neon Hunter separates these responsibilities:
 
-- **Lógica de Estado (`updateState`)**: Maneja la física, colisiones y reglas del juego. Este código es **autoritativo** y está listo para ser movido a un servidor (Node.js).
-- **Lógica Visual (`updateVisuals`)**: Gestiona efectos secundarios como partículas, estelas (trails) y animaciones de ambiente que no afectan el resultado del juego.
-- **Renderizado (`draw`)**: Puramente visual, encargado de dibujar el estado actual en el `<canvas>`.
+- **State Logic (`updateState`)**: Handles physics, collisions, and game rules. This code is **authoritative** and ready to be moved to a server (Node.js).
+- **Visual Logic (`updateVisuals`)**: Manages side effects like particles, trails, and environmental animations that don't affect the game outcome.
+- **Rendering (`draw`)**: Purely visual, in charge of drawing the current state on the `<canvas>`.
 
-### 2. Algoritmo de Cuadrícula Espacial (Spatial Grid)
+### 2. Spatial Grid Algorithm
 
-Para evitar el costoso cálculo de colisiones de "todos contra todos" (O(n²)), utilizamos una **Spatial Grid** (`SpatialGrid.js`):
+To avoid the costly "all-versus-all" (O(n²)) collision calculation, we use a **Spatial Grid** (`SpatialGrid.js`):
 
-- El mundo se divide en celdas de 400x400px.
-- Cada entidad se registra solo en la celda donde se encuentra.
-- Las colisiones solo se verifican contra entidades en celdas adyacentes, reduciendo drásticamente la carga computacional y permitiendo cientos de objetos simultáneos sin lag.
+- The world is divided into 400x400px cells.
+- Each entity is registered only in the cell where it is located.
+- Collisions are only checked against entities in adjacent cells, drastically reducing computational load and allowing hundreds of simultaneous objects without lag.
 
-### 3. Agrupación de Objetos (Object Pooling)
+### 3. Object Pooling
 
-Para evitar el "Garbage Collection stutter" (pausas por liberación de memoria), implementamos un sistema de **Object Pooling** (`ObjectPool.js`):
+To avoid "Garbage Collection stutter" (pauses due to memory release), we implemented an **Object Pooling** system (`ObjectPool.js`):
 
-- Las balas, enemigos y partículas no se crean y destruyen constantemente.
-- Se reutilizan objetos "muertos" de una reserva pre-asignada, manteniendo una huella de memoria estable y un rendimiento fluido.
-
+- Bullets, enemies, and particles are not constantly created and destroyed.
+- "Dead" objects are reused from a pre-allocated pool, maintaining a stable memory footprint and smooth performance.
 
 ---
 
-## 🎮 Controles y UI
+## 👾 Enemy Behavior
 
-- **Movimiento**: Teclas `W`, `A`, `S`, `D`.
-- **Disparo**: Click izquierdo del ratón.
-- **Interfaz**:
-  - El **Score**, **Coins** y **FPS** se dibujan directamente en el buffer del canvas para minimizar el overhead del DOM.
-  - El juego incluye un **Minimap** táctico en la esquina inferior derecha.
+Enemies in Neon Hunter exhibit specific behaviors designed to challenge the player:
 
-## 🛠️ Desarrollo Multijugador
+- **Aggressive Chasing**: Enemies constantly calculate the vector towards the player and move at a random speed (between 180 and 250 units/sec) to intercept them.
+- **Social Separation**: They implement a separation algorithm. If they get too close to each other, they apply a "push" force to avoid overlapping, creating a "swarming" effect rather than stacking.
+- **Dynamic Spawning**:
+    - They spawn at a safe distance from the player (between 600 and 1000 units).
+    - The spawner ensures they appear near the current camera view but not directly on top of the player.
+    - If an enemy goes too far off-screen, it is automatically recycled and repositioned near the player's current view.
+- **Combat & Effects**:
+    - On collision with the player, the enemy is destroyed, the player takes damage, and a camera shake effect is triggered.
+    - When shot by a bullet, they explode into multiple neon particles and grant points.
 
-El archivo `game.js` incluye hooks preparados para networking:
+---
 
-- `sendInputToServer()`: Punto de entrada para WebSockets para enviar inputs.
-- `onServerUpdateReceived()`: Para sincronizar el estado global desde un servidor.
+## 🎮 Controls and UI
 
-## 📦 Instalación y Ejecución
+- **Movement**: `W`, `A`, `S`, `D` keys.
+- **Shooting**: Left mouse click.
+- **Interface**:
+  - **Score**, **Coins**, and **FPS** are drawn directly to the canvas buffer to minimize DOM overhead.
+  - The game includes a tactical **Minimap** in the top-right corner.
 
-### Ejecutar en el navegador (sin usar `npm run start`) ✅
+## 🛠️ Multiplayer Development
 
-Puedes probar el juego en tu navegador local sin usar el script `npm run start`:
+The `game.js` file includes hooks prepared for networking:
 
-- **Opción A — Abrir directamente (simple):** Abrir `index.html` con el navegador (ruta `file://`). *Nota:* algunos navegadores pueden restringir módulos o peticiones por seguridad; si ves errores en la consola usa la Opción B.
+- `sendInputToServer()`: Entry point for WebSockets to send inputs.
+- `onServerUpdateReceived()`: To synchronize the global state from a server.
 
-- **Opción B — Servidor estático rápido (recomendado):** Si tienes Python instalado, en la raíz del proyecto ejecuta:
+## 📦 Installation and Execution
+
+### Run in the browser (without using `npm run start`) ✅
+
+You can test the game in your local browser without using the `npm run start` script:
+
+- **Option A — Open directly (simple):** Open `index.html` with your browser (`file://` path). *Note:* some browsers may restrict modules or requests for security; if you see errors in the console, use Option B.
+
+- **Option B — Quick static server (recommended):** If you have Python installed, run this in the project root:
   ```bash
   python3 -m http.server 8000
   ```
-  luego abre `http://localhost:8000` en tu navegador.
+  then open `http://localhost:8000` in your browser.
 
-- **Opción C — Servir con Node.js sin usar `npm run start`:** Si prefieres usar Node.js sin ejecutar un script `npm`, puedes usar `npx` para ejecutar un servidor temporal:
+- **Option C — Serve with Node.js without using `npm run start`:** If you prefer using Node.js without running an `npm` script, you can use `npx` to run a temporary server:
   ```bash
   npx serve . -l 8000
   ```
-  (Esto requiere Node.js instalado, pero no necesita crear o ejecutar un script en `package.json`.)
+  (This requires Node.js installed but doesn't need to create or run a script in `package.json`.)
 
-### Modo multijugador con Node.js (Socket.IO) 🔧
+### Multiplayer mode with Node.js (Socket.IO) 🔧
 
-El proyecto incluye `server.js` para el modo multijugador usando Express + Socket.IO.
+The project includes `server.js` for multiplayer mode using Express + Socket.IO.
 
-1. Asegúrate de tener Node.js instalado (v16+).
-2. Instala dependencias (solo la primera vez):
+1. Ensure you have Node.js installed (v20+).
+2. Install dependencies (first time only):
    ```bash
    npm install
    ```
-   Esto instalará `express` y `socket.io` como aparecen en `package.json`.
-3. Inicia el servidor con Node (sin `npm run start`):
+   This will install `express` and `socket.io` as listed in `package.json`.
+3. Start the server with Node (without `npm run start`):
    ```bash
    node server.js
    ```
-   Por defecto escucha en `http://localhost:3000`, pero también puede leer la variable de entorno `PORT`. Por ejemplo:
+   By default, it listens on `http://localhost:3000`, but it can also read the `PORT` environment variable. For example:
    ```bash
    PORT=4000 node server.js
    ```
-   (En PowerShell de Windows usa: `$env:PORT=4000; node server.js`.)
+   (In Windows PowerShell use: `$env:PORT=4000; node server.js`.)
 
-   También hay un script npm conveniente incluido en `package.json`:
+   There is also a convenient npm script included in `package.json`:
    ```bash
    npm run start:port
    ```
-   **Recomendado (portátil):** Este script arranca el servidor en el puerto `4000` por defecto si `PORT` no está definido, usando un pequeño wrapper en Node que funciona en todas las plataformas.
+   **Recommended (portable):** This script starts the server on port `4000` by default if `PORT` is not defined, using a small Node wrapper that works on all platforms.
 
-   - Para usar otro puerto, define la variable `PORT` antes de ejecutar el script:
+   - To use another port, define the `PORT` variable before running the script:
      - Linux/macOS:
        ```bash
        PORT=5000 npm run start:port
@@ -105,105 +120,39 @@ El proyecto incluye `server.js` para el modo multijugador usando Express + Socke
        $env:PORT=5000; npm run start:port
        ```
 
-   También puedes ejecutar directamente sin npm:
-   ```bash
-   PORT=5000 node server.js
-   ```
+   Note: `cross-env` was kept in `devDependencies` as an alternative option if preferred.
 
-   Nota: `cross-env` se mantuvo en `devDependencies` como opción alternativa si la prefieres.
-
-4. Abre `http://localhost:3000` (o `http://localhost:<PORT>` si usaste otra configuración) en uno o varios navegadores/dispositivos para probar el multijugador. El servidor por defecto permite conexiones desde cualquier origen (CORS: "*") para facilitar pruebas locales; en producción deberías restringir `ALLOWED_ORIGIN`:
+4. Open `http://localhost:3000` (or `http://localhost:<PORT>` if you used another configuration) in one or more browsers/devices to test multiplayer. The default server allows connections from any origin (CORS: "*") to facilitate local testing; in production, you should restrict `ALLOWED_ORIGIN`:
 
 ```bash
 ALLOWED_ORIGIN=https://example.com PORT=4000 node server.js
 ```
 
-Puedes también especificar un directorio público diferente con la variable `PUBLIC_DIR` (recomendado en producción):
+You can also specify a different public directory with the `PUBLIC_DIR` variable (recommended in production):
 
 ```bash
 PUBLIC_DIR=public PORT=4000 node server.js
 ```
 
-El servidor maneja señales `SIGINT` y `SIGTERM` y realiza un apagado ordenado (graceful shutdown) para cerrar conexiones activas.
+The server handles `SIGINT` and `SIGTERM` signals and performs a graceful shutdown to close active connections.
 
-> Nota: Si necesitas cambiar el puerto en pruebas locales o producción, establece la variable de entorno `PORT` antes de iniciar el servidor (por ejemplo `PORT=4000 node server.js`). Si prefieres, también puedes editar `server.js`.
+> Note: If you need to change the port in local testing or production, set the `PORT` environment variable before starting the server. If you prefer, you can also edit `server.js`.
 
-**Requisito:** Este proyecto requiere **Node.js v20 o superior** (`engines.node` en `package.json`).
+**Requirement:** This project requires **Node.js v20 or higher** (`engines.node` in `package.json`).
 
-**Nota:** La dependencia `cross-env@^10` requiere Node.js v20+. Si necesitas soporte para Node 16/18 en tu entorno, considera usar una versión anterior de `cross-env` o ajustar la dependencia en `package.json`.
+**Note:** The `cross-env@^10` dependency requires Node.js v20+. If you need support for Node 16/18 in your environment, consider using an earlier version of `cross-env` or adjusting the dependency in `package.json`.
 
----
+### TODOs / Next Steps ✅
 
-## 📦 Liberación de Versiones
+- [ ] **Add basic integration tests** that start and stop the server (start/shutdown) and verify that endpoints and socket events work. Use `module.exports = { server, io }` for testing control.
+- [ ] Add a `public/` folder with an example `index.html` to facilitate local testing and deployments.
+- [ ] Document the production deployment flow (e.g., `pm2`, `systemd`) and recommendations for `ALLOWED_ORIGIN`.
 
-El proyecto incluye un script automatizado para desplegar versiones del juego a **GitHub Pages**.
+### Quick Tips 📝
 
-### Configuración inicial (solo una vez)
-
-1. **Habilita GitHub Pages en tu repositorio:**
-   - Ve a: `https://github.com/[tu-usuario]/neon-hunter/settings/pages`
-   - En **"Source"**, selecciona:
-     - **Branch:** `gh-pages`
-     - **Folder:** `/ (root)`
-   - Haz clic en **"Save"**
-
-2. **Asegúrate de tener permisos de escritura** en la rama `gh-pages`.
-
-### Cómo liberar una nueva versión
-
-El nuevo sistema de despliegue es completamente automático y puede ejecutarse desde cualquier rama.
-
-```bash
-# Ejecuta el script sin argumentos
-./deploy-version.sh
-```
-
-El script automáticamente:
-1.  🔮 **Calcula la siguiente versión** (v3.0 -> v4.0, etc.)
-2.  🐾 **Genera un Pet Name** único basado en el commit (ej. `frost-ranger`, `cyber-dragon`)
-3.  🏷️ **Crea un Tag** de Git con toda la metadata
-4.  📦 **Crea un GitHub Release** con notas automáticas (si tienes `gh` CLI instalado)
-5.  🚀 **Despliega a GitHub Pages** y actualiza el índice de versiones
-
-**Ejemplo de flujo de trabajo:**
-
-1.  Estás trabajando en una nueva feature en la rama `feat/naves-enemigas`
-2.  Terminas tus cambios y haces commit
-3.  Ejecutas `./deploy-version.sh`
-4.  ¡Listo! Se crea la versión `v4.0-neon-viper` (ejemplo) y te da el link para probarla.
-
-### URLs de acceso
-
-Después del despliegue (tarda 1-2 minutos en estar disponible):
-
-- **Índice de versiones:** `https://[tu-usuario].github.io/neon-hunter/`
-- **Versión específica:** `https://[tu-usuario].github.io/neon-hunter/releases/v3.0/`
-
-**Ejemplo:**
-- Índice: https://ivanchenoweth.github.io/neon-hunter/
-- Versión 3.0: https://ivanchenoweth.github.io/neon-hunter/releases/v3.0/
-
-### Notas importantes
-
-- 📌 **No necesitas especificar versión**, el script la calcula sola.
-- 📌 El script **NO** modifica tu rama de trabajo actual (usa worktrees).
-- 📌 Cada versión se mantiene independiente en su carpeta.
-- 📌 El pet name (`frost-ranger`) es determinístico: siempre será el mismo para el mismo commit.
-- 📌 El archivo `.nojekyll` en `gh-pages` asegura que GitHub Pages sirva todos los archivos correctamente.
+- For testing on the local network, use the machine's IP (e.g., `http://192.168.1.5:3000`).
+- To keep the server running in the background on Linux, consider `nohup node server.js &` or using `pm2`.
 
 ---
 
-### TODOs / Próximos pasos ✅
-
-- [ ] **Agregar tests de integración básicos** que arranquen y apaguen el servidor (start/shutdown) y verifiquen que endpoints y socket events funcionen. Aprovechar `module.exports = { server, io }` para control en pruebas.
-- [ ] Añadir una carpeta `public/` con un ejemplo `index.html` para facilitar pruebas locales y despliegues.
-- [ ] Documentar el flujo de despliegue en producción (ej. `pm2`, `systemd`) y recomendaciones para `ALLOWED_ORIGIN`.
-
-### Consejos rápidos 📝
-
-- Para pruebas en la red local, usa la IP de la máquina (ej. `http://192.168.1.5:3000`).
-- Para mantener el servidor en ejecución en segundo plano en Linux, considera `nohup node server.js &` o usar `pm2`.
-
----
-
-**Autor:** Ivan R. Chenoweth
+**Author:** Ivan R. Chenoweth
