@@ -426,7 +426,7 @@ class Game {
         ctx.shadowBlur = 0;
         ctx.font = 'bold 16px "Outfit", sans-serif';
         ctx.fillStyle = '#00ff88';
-        ctx.fillText('v10.0-brave-warrior', cx, cy - 150);
+        ctx.fillText('v11.0-lunar-pilot', cx, cy - 150);
 
         // Zoom Controls
         ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
