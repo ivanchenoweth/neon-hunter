@@ -119,6 +119,9 @@ class Game {
 
         this.lastTime = 0;
         this.loop = this.loop.bind(this);
+
+        // Center camera on player immediately
+        this.camera.follow(this.player, 0);
     }
 
     handleResize() {
@@ -208,18 +211,20 @@ class Game {
         // Consistent with Enemy.js: marginW=800, marginH=600
         const marginW = 800;
         const marginH = 600;
+        const viewW = this.camera.width / this.camera.zoom;
+        const viewH = this.camera.height / this.camera.zoom;
 
         const spawnX = centerX + (this.camera.x - marginW) * scale;
         const spawnY = centerY + (this.camera.y - marginH) * scale;
-        const spawnW = (this.camera.width + 2 * marginW) * scale;
-        const spawnH = (this.camera.height + 2 * marginH) * scale;
+        const spawnW = (viewW + 2 * marginW) * scale;
+        const spawnH = (viewH + 2 * marginH) * scale;
 
         ctx.strokeStyle = 'rgba(255, 100, 100, 0.5)';
         ctx.lineWidth = 1;
         ctx.strokeRect(spawnX, spawnY, spawnW, spawnH);
 
-        // Optional: fill spawn area with very light transparency
-        ctx.fillStyle = 'rgba(255, 100, 100, 0.05)';
+        // Fill spawn area with very light transparency as requested
+        ctx.fillStyle = 'rgba(255, 100, 100, 0.15)';
         ctx.fillRect(spawnX, spawnY, spawnW, spawnH);
 
         // Draw camera viewport on minimap
@@ -233,9 +238,8 @@ class Game {
 
         // Draw player on minimap
         ctx.fillStyle = '#fff';
-        // ctx.beginPath();
-        // ctx.arc(px, py, 3, 0, Math.PI * 2);
-        // ctx.fill();
+        const px = centerX + this.player.x * scale;
+        const py = centerY + this.player.y * scale;
         ctx.fillRect(px - 1.5, py - 1.5, 3, 3);
 
         // Draw enemies on minimap
@@ -819,12 +823,19 @@ class Game {
     }
 
     isOffScreen(entity) {
-        const margin = entity.size || 50;
+        // MUST use zoomed viewport dimensions. 
+        // Viewport width in world space is this.width / this.camera.zoom
+        const viewW = this.width / this.camera.zoom;
+        const viewH = this.height / this.camera.zoom;
+
+        // Reset margin MUST be larger than spawn margin (800 in Enemy.js)
+        const resetMargin = 1500;
+
         return (
-            entity.x + margin < this.camera.x ||
-            entity.x - margin > this.camera.x + this.width ||
-            entity.y + margin < this.camera.y ||
-            entity.y - margin > this.camera.y + this.height
+            entity.x < this.camera.x - resetMargin ||
+            entity.x > this.camera.x + viewW + resetMargin ||
+            entity.y < this.camera.y - resetMargin ||
+            entity.y > this.camera.y + viewH + resetMargin
         );
     }
 

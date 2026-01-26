@@ -134,6 +134,9 @@ class Enemy {
      */
     _setRectangularSpawnPosition() {
         const cam = this.game.camera;
+        const viewW = cam.width / cam.zoom;
+        const viewH = cam.height / cam.zoom;
+
         // Use distances similar to the previous circular rings for consistency
         // But mapped to a rectangle. 
         const marginW = 800;
@@ -145,20 +148,20 @@ class Enemy {
         // but close enough to head towards the player.
         switch (side) {
             case 0: // Top
-                this.x = cam.x + Math.random() * cam.width;
+                this.x = cam.x + Math.random() * viewW;
                 this.y = cam.y - marginH;
                 break;
             case 1: // Bottom
-                this.x = cam.x + Math.random() * cam.width;
-                this.y = cam.y + cam.height + marginH;
+                this.x = cam.x + Math.random() * viewW;
+                this.y = cam.y + viewH + marginH;
                 break;
             case 2: // Left
                 this.x = cam.x - marginW;
-                this.y = cam.y + Math.random() * cam.height;
+                this.y = cam.y + Math.random() * viewH;
                 break;
             case 3: // Right
-                this.x = cam.x + cam.width + marginW;
-                this.y = cam.y + Math.random() * cam.height;
+                this.x = cam.x + viewW + marginW;
+                this.y = cam.y + Math.random() * viewH;
                 break;
         }
 
