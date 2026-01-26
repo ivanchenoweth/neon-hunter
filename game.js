@@ -205,30 +205,22 @@ class Game {
         });
 
         // Draw spawn area on minimap (where enemies appear)
-        const spawnMinDistance = 600;
-        const spawnMaxDistance = 1000;
-        const px = centerX + this.player.x * scale;
-        const py = centerY + this.player.y * scale;
+        // Consistent with Enemy.js: marginW=800, marginH=600
+        const marginW = 800;
+        const marginH = 600;
 
-        // Draw outer spawn ring (max distance)
-        ctx.strokeStyle = 'rgba(255, 100, 100, 0.3)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.arc(px, py, spawnMaxDistance * scale, 0, Math.PI * 2);
-        ctx.stroke();
+        const spawnX = centerX + (this.camera.x - marginW) * scale;
+        const spawnY = centerY + (this.camera.y - marginH) * scale;
+        const spawnW = (this.camera.width + 2 * marginW) * scale;
+        const spawnH = (this.camera.height + 2 * marginH) * scale;
 
-        // Draw inner spawn ring (min distance)
         ctx.strokeStyle = 'rgba(255, 100, 100, 0.5)';
-        ctx.beginPath();
-        ctx.arc(px, py, spawnMinDistance * scale, 0, Math.PI * 2);
-        ctx.stroke();
+        ctx.lineWidth = 1;
+        ctx.strokeRect(spawnX, spawnY, spawnW, spawnH);
 
-        // Fill the spawn ring area with semi-transparent red (between inner and outer rings only)
-        ctx.fillStyle = 'rgba(255, 100, 100, 0.25)';
-        ctx.beginPath();
-        ctx.arc(px, py, spawnMaxDistance * scale, 0, Math.PI * 2);
-        ctx.arc(px, py, spawnMinDistance * scale, 0, Math.PI * 2, true); // Counter-clockwise to create donut
-        ctx.fill('evenodd');
+        // Optional: fill spawn area with very light transparency
+        ctx.fillStyle = 'rgba(255, 100, 100, 0.05)';
+        ctx.fillRect(spawnX, spawnY, spawnW, spawnH);
 
         // Draw camera viewport on minimap
         const vx = centerX + this.camera.x * scale;

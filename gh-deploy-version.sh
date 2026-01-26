@@ -161,9 +161,10 @@ sed -i.bak "s|<body>|<body>\n    ${VERSION_HTML}|" index.html
 
 # Agregar CSS para el version badge y meta si no existe
 if ! grep -q "\.version-meta" index.html; then
-    sed -i.bak 's|</style>|        .version-info {\n            display: flex;\n            flex-direction: column;\n            align-items: center;\n            margin-bottom: 15px;\n        }\n        .version-badge {\n            display: inline-block;\n            background: linear-gradient(135deg, rgba(0,255,136,0.2), rgba(0,200,100,0.1));\n            border: 1px solid rgba(0,255,136,0.3);\n            color: #00ff88;\n            padding: 4px 12px;\n            border-radius: 20px;\n            font-size: 11px;\n            font-weight: 600;\n            letter-spacing: 0.5px;\n            text-shadow: 0 0 10px rgba(0,255,136,0.5);\n            margin-bottom: 4px;\n        }\n        .version-meta {
-            display: block;
-            font-size: 10px;\n            color: rgba(255,255,255,0.7);\n            font-weight: 400;\n            font-family: monospace;\n        }\n    </style>|g' index.html
+    CSS_BLOCK="        .version-info {\n            display: flex;\n            flex-direction: column;\n            align-items: center;\n            margin-bottom: 15px;\n        }\n        .version-badge {\n            display: inline-block;\n            background: linear-gradient(135deg, rgba(0,255,136,0.2), rgba(0,200,100,0.1));\n            border: 1px solid rgba(0,255,136,0.3);\n            color: #00ff88;\n            padding: 4px 12px;\n            border-radius: 20px;\n            font-size: 11px;\n            font-weight: 600;\n            letter-spacing: 0.5px;\n            text-shadow: 0 0 10px rgba(0,255,136,0.5);\n            margin-bottom: 4px;\n        }\n        .version-meta {\n            display: block;\n            font-size: 10px;\n            color: rgba(255,255,255,0.7);\n            font-weight: 400;\n            font-family: monospace;\n        }"
+    
+    # Insertar el bloque CSS antes del cierre del estilo
+    sed -i.bak "/<\/style>/i $CSS_BLOCK" index.html
 fi
 
 # Limpiar archivo de backup
