@@ -203,39 +203,61 @@ cat > index.html << 'EOF'
         async function loadReleases() {
             try {
                 const response = await fetch('releases/');
+                if (!response.ok) throw new Error('No se puede acceder a releases/');
+                
                 const html = await response.text();
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(html, 'text/html');
                 
-                // Extraer directorios (versiones) disponibles
-                const links = Array.from(doc.querySelectorAll('a'))
-                    .map(a => a.getAttribute('href'))
-                    .filter(href => href && /^v\d+\.\d+\.\d+\/$/.test(href))
-                    .sort()
-                    .reverse();
+                // Extraer directorios (versiones) disponibles - múltiples formatos de lista HTML
+                let links = Array.from(doc.querySelectorAll('a'))
+                    .map(a => {
+                        let href = a.getAttribute('href');
+                        // Normalizar: remover / final y ./ inicial si existen
+                        if (href) {
+                            href = href.replace(/\/$/, '').replace(/^\.\//, '');
+                        }
+                        return href;
+                    })
+                    .filter(href => href && /^v\d+\.\d+\.\d+$/.test(href));
+                
+                // Remover duplicados y ordenar
+                links = [...new Set(links)];
+                links.sort((a, b) => {
+                    // Ordenar por versión descendente
+                    const aVer = a.split('.').map(Number);
+                    const bVer = b.split('.').map(Number);
+                    for (let i = 0; i < 3; i++) {
+                        if (aVer[i] !== bVer[i]) return bVer[i] - aVer[i];
+                    }
+                    return 0;
+                });
+                
+                const releasesDiv = document.getElementById('releases');
                 
                 if (links.length > 0) {
-                    const releasesDiv = document.getElementById('releases');
                     releasesDiv.innerHTML = '';
                     
-                    links.forEach(link => {
-                        const version = link.replace(/\/$/, '');
+                    links.forEach(version => {
                         const card = document.createElement('div');
                         card.className = 'release-card';
                         card.innerHTML = `
                             <h2>${version}</h2>
                             <p>Versión Semántica</p>
-                            <a href="${link}">Jugar Ahora →</a>
+                            <a href="releases/${version}/">Jugar Ahora →</a>
                         `;
                         releasesDiv.appendChild(card);
                     });
+                } else {
+                    console.warn('No se encontraron versiones en el formato esperado');
                 }
             } catch (error) {
-                console.log('Releases no disponibles aún');
+                console.error('Error al cargar releases:', error);
             }
         }
         
-        loadReleases();
+        // Cargar releases cuando el DOM esté listo
+        document.addEventListener('DOMContentLoaded', loadReleases);
     </script>
 </body>
 </html>
