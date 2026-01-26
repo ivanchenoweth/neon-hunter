@@ -261,20 +261,16 @@ mkdir -p "$TARGET_DIR"
 
 echo "📦 Copiando archivos a releases/$NEXT_VERSION..."
 
-# Copiar archivos necesarios
-rsync -av \
-    --exclude '.git' \
-    --exclude 'node_modules' \
-    --exclude '.DS_Store' \
-    --exclude 'deploy-version.sh' \
-    --exclude 'server.js' \
-    --exclude 'package*.json' \
-    --include '*.html' \
-    --include '*.js' \
-    --include '*.css' \
-    --include 'assets***' \
-    --exclude '*' \
-    ./ "$TARGET_DIR/"
+# Copiar archivos necesarios usando comandos nativos
+# Copiar archivos HTML, JS y CSS
+find . -maxdepth 1 \( -name "*.html" -o -name "*.js" -o -name "*.css" \) \
+    ! -name "server.js" \
+    -exec cp {} "$TARGET_DIR/" \;
+
+# Copiar directorio assets si existe
+if [ -d "assets" ]; then
+    cp -r assets "$TARGET_DIR/"
+fi
 
 # Crear archivo de metadata con el pet name para lectura posterior
 echo "$PET_NAME" > "$TARGET_DIR/.pet-name"
