@@ -426,7 +426,7 @@ class Game {
         ctx.shadowBlur = 0;
         ctx.font = 'bold 16px "Outfit", sans-serif';
         ctx.fillStyle = '#00ff88';
-        ctx.fillText('v1.10.0-mystic-pilot (feat/32-warps-and-enemies-count • 2026-01-26 12:35)', cx, cy - 150); // VERSION_BADGE
+        ctx.fillText('v1.11.0-hyper-viper (feat/32-warps-and-enemies-count • 2026-01-26 12:42)', cx, cy - 150); // VERSION_BADGE
 
         // Zoom Controls
         ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
