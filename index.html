@@ -1,159 +1,81 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang='en'>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Hunter - Releases</title>
+    <meta charset='UTF-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+    <title>Neon Hunter - Versions</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            color: #00ff88;
-            padding: 20px;
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            background: linear-gradient(135deg, #0d0d12 0%, #1a1a24 50%, #0d0d12 100%);
+            color: #fff; 
+            font-family: 'Outfit', sans-serif; 
             min-height: 100vh;
+            padding: 40px 20px;
         }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        header {
-            text-align: center;
-            margin-bottom: 40px;
-            border-bottom: 2px solid #00ff88;
-            padding-bottom: 20px;
-        }
-        h1 {
-            font-size: 2.5em;
-            text-shadow: 0 0 10px #00ff88;
+        .container { max-width: 600px; margin: 0 auto; }
+        h1 { 
+            color: #00ff88; 
+            text-shadow: 0 0 20px rgba(0,255,136,0.5); 
             margin-bottom: 10px;
+            font-size: 2.5rem;
+            text-align: center;
         }
         .subtitle {
-            color: #00cc66;
-            font-size: 1.1em;
+            color: rgba(255,255,255,0.6);
+            text-align: center;
+            margin-bottom: 40px;
+            font-size: 1rem;
         }
-        .releases {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 20px;
-            margin-top: 30px;
-        }
-        .release-card {
-            background: rgba(0, 255, 136, 0.05);
-            border: 2px solid #00ff88;
-            border-radius: 8px;
-            padding: 20px;
-            transition: all 0.3s ease;
-            cursor: pointer;
-        }
-        .release-card:hover {
-            background: rgba(0, 255, 136, 0.1);
-            box-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
-            transform: translateY(-5px);
-        }
-        .release-card h2 {
-            color: #00ffff;
-            margin-bottom: 10px;
-            font-size: 1.5em;
-        }
-        .release-card p {
-            color: #00cc66;
-            margin: 5px 0;
-        }
-        .release-card a {
-            display: inline-block;
-            margin-top: 15px;
-            padding: 10px 20px;
-            background: #00ff88;
-            color: #1a1a2e;
-            text-decoration: none;
-            border-radius: 4px;
-            font-weight: bold;
+        .version-list { list-style: none; }
+        .version-item { margin: 15px 0; }
+        .version-link { 
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 24px; 
+            background: rgba(255,255,255,0.03); 
+            border: 1px solid rgba(0,255,136,0.15); 
+            color: #fff; 
+            text-decoration: none; 
+            border-radius: 12px; 
             transition: all 0.3s ease;
         }
-        .release-card a:hover {
-            background: #00cc66;
-            box-shadow: 0 0 10px #00ff88;
+        .version-link:hover { 
+            background: rgba(0,255,136,0.08); 
+            border-color: #00ff88; 
+            transform: translateY(-3px); 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4), 0 0 20px rgba(0,255,136,0.1);
         }
-        .empty-state {
-            text-align: center;
-            padding: 40px;
-            color: #00cc66;
-            font-size: 1.2em;
+        .version-name {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #00ff88;
         }
-        footer {
-            text-align: center;
-            margin-top: 40px;
-            padding-top: 20px;
-            border-top: 2px solid #00ff88;
-            color: #00cc66;
+        .version-pet-name {
+            font-size: 0.9rem;
+            color: rgba(255,255,255,0.6);
+            text-transform: capitalize;
+        }
+        .play-btn {
+            background: linear-gradient(135deg, #00ff88, #00cc6f);
+            color: #0d0d12;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 0.85rem;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <header>
-            <h1>🎮 Neon Hunter</h1>
-            <p class="subtitle">Releases & Versions</p>
-        </header>
-        
-        <main>
-            <div id="releases" class="releases">
-                <div class="empty-state">
-                    <p>No hay versiones disponibles aún.</p>
-                    <p>Próximamente se desplegarán nuevas versiones con SemVer.</p>
-                </div>
-            </div>
-        </main>
-        
-        <footer>
-            <p>© 2026 Neon Hunter | Versionado Semántico (SemVer)</p>
-            <p><a href="https://github.com/ivanchenoweth/neon-hunter" style="color: #00ff88; text-decoration: none;">Ver en GitHub</a></p>
-        </footer>
+        <h1>🎮 Neon Hunter</h1>
+        <p class="subtitle">Select a version to play</p>
+        <ul class='version-list'>
+        </ul>
     </div>
-
-    <script>
-        // Script para cargar dinámicamente las versiones disponibles desde releases/
-        async function loadReleases() {
-            try {
-                const response = await fetch('releases/');
-                const html = await response.text();
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(html, 'text/html');
-                
-                // Extraer directorios (versiones) disponibles
-                const links = Array.from(doc.querySelectorAll('a'))
-                    .map(a => a.getAttribute('href'))
-                    .filter(href => href && /^v\d+\.\d+\.\d+\/$/.test(href))
-                    .sort()
-                    .reverse();
-                
-                if (links.length > 0) {
-                    const releasesDiv = document.getElementById('releases');
-                    releasesDiv.innerHTML = '';
-                    
-                    links.forEach(link => {
-                        const version = link.replace(/\/$/, '');
-                        const card = document.createElement('div');
-                        card.className = 'release-card';
-                        card.innerHTML = `
-                            <h2>${version}</h2>
-                            <p>Versión Semántica</p>
-                            <a href="${link}">Jugar Ahora →</a>
-                        `;
-                        releasesDiv.appendChild(card);
-                    });
-                }
-            } catch (error) {
-                console.log('Releases no disponibles aún');
-            }
-        }
-        
-        loadReleases();
-    </script>
 </body>
 </html>
