@@ -137,31 +137,29 @@ class Enemy {
         const viewW = cam.width / cam.zoom;
         const viewH = cam.height / cam.zoom;
 
-        // Use distances similar to the previous circular rings for consistency
-        // But mapped to a rectangle. 
-        const marginW = 800;
-        const marginH = 600;
+        // Reduced margins to bring spawning closer to the visible area
+        const marginW = 150;
+        const marginH = 150;
 
         const side = Math.floor(Math.random() * 4); // 0: Top, 1: Bottom, 2: Left, 3: Right
 
-        // Positions are relative to the camera view to ensure they spawn "off-screen" 
-        // but close enough to head towards the player.
+        // Broaden the ranges to include the corner areas (points outside the screen-corners)
         switch (side) {
-            case 0: // Top
-                this.x = cam.x + Math.random() * viewW;
+            case 0: // Top edge (including corners)
+                this.x = cam.x - marginW + Math.random() * (viewW + 2 * marginW);
                 this.y = cam.y - marginH;
                 break;
-            case 1: // Bottom
-                this.x = cam.x + Math.random() * viewW;
+            case 1: // Bottom edge (including corners)
+                this.x = cam.x - marginW + Math.random() * (viewW + 2 * marginW);
                 this.y = cam.y + viewH + marginH;
                 break;
-            case 2: // Left
+            case 2: // Left edge (including corners)
                 this.x = cam.x - marginW;
-                this.y = cam.y + Math.random() * viewH;
+                this.y = cam.y - marginH + Math.random() * (viewH + 2 * marginH);
                 break;
-            case 3: // Right
+            case 3: // Right edge (including corners)
                 this.x = cam.x + viewW + marginW;
-                this.y = cam.y + Math.random() * viewH;
+                this.y = cam.y - marginH + Math.random() * (viewH + 2 * marginH);
                 break;
         }
 

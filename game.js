@@ -208,9 +208,9 @@ class Game {
         });
 
         // Draw spawn area on minimap (where enemies appear)
-        // Consistent with Enemy.js: marginW=800, marginH=600
-        const marginW = 800;
-        const marginH = 600;
+        // Consistent with Enemy.js: marginW=150, marginH=150
+        const marginW = 150;
+        const marginH = 150;
         const viewW = this.camera.width / this.camera.zoom;
         const viewH = this.camera.height / this.camera.zoom;
 

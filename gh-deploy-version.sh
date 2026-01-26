@@ -128,7 +128,7 @@ if [ -f "game.js" ]; then
     # Reemplazar cualquier cadena usada como badge en la llamada a ctx.fillText(..., cx, cy - 150)
     # Esto captura tanto formatos con prefijo de versión como los que solo contienen el pet name.
     # Usamos -E (extended regex) para mayor legibilidad.
-    sed -i.bak -E "s/ctx\.fillText\('[^']*'\s*,\s*cx\s*,\s*cy\s*-\s*150\s*\);/ctx.fillText('${RELEASE_ID} (${CURRENT_BRANCH} • ${BUILD_DATE})', cx, cy - 150);/g" game.js
+    sed -i.bak -E "s|ctx\.fillText\('[^']*'\s*,\s*cx\s*,\s*cy\s*-\s*150\s*\);|ctx.fillText('${RELEASE_ID} (${CURRENT_BRANCH} • ${BUILD_DATE})', cx, cy - 150);|g" game.js
     # Si hubo cambio, commitear; si no, informar
     if ! cmp -s game.js game.js.bak 2>/dev/null; then
         rm -f game.js.bak
@@ -153,8 +153,8 @@ VERSION_HTML="<div id=\"version-info\" style=\"position: absolute; top: 10px; le
 
 # Eliminar versiones anteriores (limpieza para evitar duplicados o formatos viejos)
 # Esto borra tanto el span solitario viejo como el div nuevo si ya existe
-sed -i.bak '/id="version-info"/,/<\/div>/d' index.html
-sed -i.bak '/id="version-badge"/d' index.html
+sed -i.bak '\|id="version-info"|,\|</div>|d' index.html
+sed -i.bak '\|id="version-badge"|d' index.html
 
 # Insertar el nuevo bloque justo después de la etiqueta <body>
 sed -i.bak "s|<body>|<body>\n    ${VERSION_HTML}|" index.html
