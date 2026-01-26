@@ -50,21 +50,10 @@ echo ""
 if [ -d "releases" ]; then
     # Listar lo que se va a eliminar
     echo "📋 Directorios a eliminar:"
-    ls releases/ | while read dir; do
-        # Solo mostrar directorios que sigan el patrón viejo (v*.0 o vX)
-        if [[ $dir =~ ^v[0-9]+\.?0?$ ]]; then
-            echo "   - releases/$dir"
-        fi
-    done
-    echo ""
-    
-    # Eliminar solo los directorios viejos
-    find releases/ -maxdepth 1 -type d -name "v[0-9]*" ! -name "v[0-9]*.[0-9]*.[0-9]*" -exec rm -rf {} + 2>/dev/null || true
-    
-    echo "✅ Directorios viejos eliminados"
-    echo ""
-    echo "📋 Directorios restantes en releases/:"
-    ls releases/ 2>/dev/null | sort -rV || echo "   (vacío)"
+    ls -la releases/
+    rm -rf releases/*
+      echo "✅ releases/ quedó vacío"
+
 else
     echo "ℹ️  Directorio releases/ no existe"
 fi
