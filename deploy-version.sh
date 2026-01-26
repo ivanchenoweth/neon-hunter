@@ -369,8 +369,8 @@ cat > "$INDEX_FILE" << 'EOF'
         <ul class='version-list'>
 EOF
 
-# Agregar versiones (ordenadas de más reciente a más antigua)
-for d in $(ls -rd "$WORKTREE_DIR/releases"/*/ 2>/dev/null); do
+# Agregar versiones (ordenadas de más reciente a más antigua usando sort -V para versionado semántico)
+for d in $(ls "$WORKTREE_DIR/releases"/*/ 2>/dev/null | xargs -I {} basename {} | sort -rV | xargs -I {} find "$WORKTREE_DIR/releases" -maxdepth 1 -type d -name "{}" 2>/dev/null); do
     if [ -d "$d" ]; then
         dir_name=$(basename "$d")
         # Intentar extraer el pet name del archivo .pet-name o del index.html
