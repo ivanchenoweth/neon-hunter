@@ -123,31 +123,16 @@
         <div class="subtitle">Versiones Disponibles</div>
         
         <div class="versions-grid">
-            <div class="version-card">
-                <div class="version-number">v1.2.0</div>
-                <div class="pet-name">🌟 astral-sentinel</div>
-                <a href="releases/v1.2.0/" class="play-btn">▶ JUGAR</a>
-            </div>
-            <div class="version-card">
-                <div class="version-number">v1.1.0</div>
-                <div class="pet-name">🌟 cosmic-falcon</div>
-                <a href="releases/v1.1.0/" class="play-btn">▶ JUGAR</a>
-            </div>
-            <div class="version-card">
-                <div class="version-number">v1.0.0</div>
-                <div class="pet-name">🌟 blazing-hawk</div>
-                <a href="releases/v1.0.0/" class="play-btn">▶ JUGAR</a>
+            <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #00aa00;">
+                <p>No hay versiones disponibles aún.</p>
+                <p>Próximamente se desplegarán nuevas versiones con SemVer.</p>
             </div>
         </div>
         
         <div class="footer">
             <p>🚀 Neon Hunter - Versiones Históricas</p>
-            <p>Última versión: <span id="latest-version"></span></p>
+            <p><a href="https://github.com/ivanchenoweth/neon-hunter" style="color: #00ff00; text-decoration: none;">Ver en GitHub</a></p>
         </div>
     </div>
-    
-    <script>
-        document.getElementById('latest-version').textContent = document.querySelector('.version-number').textContent;
-    </script>
 </body>
 </html>
