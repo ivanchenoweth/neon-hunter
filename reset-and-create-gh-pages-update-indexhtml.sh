@@ -78,187 +78,144 @@ echo ""
 echo "📝 Actualizando index.html..."
 echo ""
 
-# Crear o actualizar index.html con contenido base
+# Crear o actualizar index.html - NOTE: Este será actualizado con versiones reales después del deploy
 cat > index.html << 'EOF'
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Hunter - Releases</title>
+    <title>🎮 Neon Hunter - Versiones Disponibles</title>
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
+        
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            color: #00ff88;
-            padding: 20px;
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(135deg, #0a0e27, #1a1f3a);
+            color: #00ff00;
             min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
         }
+        
         .container {
-            max-width: 1200px;
-            margin: 0 auto;
+            max-width: 900px;
+            width: 100%;
+            background: rgba(10, 14, 39, 0.8);
+            border: 2px solid #00ff00;
+            border-radius: 10px;
+            padding: 40px;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
         }
-        header {
-            text-align: center;
-            margin-bottom: 40px;
-            border-bottom: 2px solid #00ff88;
-            padding-bottom: 20px;
-        }
+        
         h1 {
-            font-size: 2.5em;
-            text-shadow: 0 0 10px #00ff88;
+            text-align: center;
             margin-bottom: 10px;
+            font-size: 2.5em;
+            text-shadow: 0 0 10px #00ff00;
+            animation: glow 2s ease-in-out infinite;
         }
+        
         .subtitle {
-            color: #00cc66;
-            font-size: 1.1em;
+            text-align: center;
+            color: #00aa00;
+            margin-bottom: 30px;
+            font-size: 0.9em;
         }
-        .releases {
+        
+        .versions-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
             gap: 20px;
             margin-top: 30px;
         }
-        .release-card {
-            background: rgba(0, 255, 136, 0.05);
-            border: 2px solid #00ff88;
-            border-radius: 8px;
+        
+        .version-card {
+            background: rgba(0, 255, 0, 0.05);
+            border: 1px solid #00ff00;
+            border-radius: 5px;
             padding: 20px;
+            text-align: center;
             transition: all 0.3s ease;
             cursor: pointer;
         }
-        .release-card:hover {
-            background: rgba(0, 255, 136, 0.1);
-            box-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+        
+        .version-card:hover {
+            background: rgba(0, 255, 0, 0.1);
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.5);
             transform: translateY(-5px);
         }
-        .release-card h2 {
-            color: #00ffff;
-            margin-bottom: 10px;
-            font-size: 1.5em;
+        
+        .version-number {
+            font-size: 1.3em;
+            color: #00ff00;
+            margin-bottom: 8px;
+            font-weight: bold;
         }
-        .release-card p {
-            color: #00cc66;
-            margin: 5px 0;
+        
+        .pet-name {
+            color: #00aa00;
+            font-size: 0.9em;
+            margin-bottom: 15px;
+            font-style: italic;
         }
-        .release-card a {
+        
+        .play-btn {
             display: inline-block;
-            margin-top: 15px;
+            background: #00ff00;
+            color: #0a0e27;
             padding: 10px 20px;
-            background: #00ff88;
-            color: #1a1a2e;
+            border-radius: 5px;
             text-decoration: none;
-            border-radius: 4px;
             font-weight: bold;
             transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
         }
-        .release-card a:hover {
-            background: #00cc66;
-            box-shadow: 0 0 10px #00ff88;
+        
+        .play-btn:hover {
+            background: #00dd00;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.7);
         }
-        .empty-state {
-            text-align: center;
-            padding: 40px;
-            color: #00cc66;
-            font-size: 1.2em;
-        }
-        footer {
+        
+        .footer {
             text-align: center;
             margin-top: 40px;
             padding-top: 20px;
-            border-top: 2px solid #00ff88;
-            color: #00cc66;
+            border-top: 1px solid #00ff00;
+            color: #00aa00;
+            font-size: 0.8em;
+        }
+        
+        @keyframes glow {
+            0%, 100% { text-shadow: 0 0 10px #00ff00; }
+            50% { text-shadow: 0 0 20px #00ff00; }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <header>
-            <h1>🎮 Neon Hunter</h1>
-            <p class="subtitle">Releases & Versions</p>
-        </header>
+        <h1>🎮 NEON HUNTER</h1>
+        <div class="subtitle">Versiones Disponibles</div>
         
-        <main>
-            <div id="releases" class="releases">
-                <div class="empty-state">
-                    <p>No hay versiones disponibles aún.</p>
-                    <p>Próximamente se desplegarán nuevas versiones con SemVer.</p>
-                </div>
+        <div class="versions-grid">
+            <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #00aa00;">
+                <p>No hay versiones disponibles aún.</p>
+                <p>Próximamente se desplegarán nuevas versiones con SemVer.</p>
             </div>
-        </main>
+        </div>
         
-        <footer>
-            <p>© 2026 Neon Hunter | Versionado Semántico (SemVer)</p>
-            <p><a href="https://github.com/ivanchenoweth/neon-hunter" style="color: #00ff88; text-decoration: none;">Ver en GitHub</a></p>
-        </footer>
+        <div class="footer">
+            <p>🚀 Neon Hunter - Versiones Históricas</p>
+            <p><a href="https://github.com/ivanchenoweth/neon-hunter" style="color: #00ff00; text-decoration: none;">Ver en GitHub</a></p>
+        </div>
     </div>
-
-    <script>
-        // Script para cargar dinámicamente las versiones disponibles desde releases/
-        async function loadReleases() {
-            try {
-                const response = await fetch('releases/');
-                if (!response.ok) throw new Error('No se puede acceder a releases/');
-                
-                const html = await response.text();
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(html, 'text/html');
-                
-                // Extraer directorios (versiones) disponibles - múltiples formatos de lista HTML
-                let links = Array.from(doc.querySelectorAll('a'))
-                    .map(a => {
-                        let href = a.getAttribute('href');
-                        // Normalizar: remover / final y ./ inicial si existen
-                        if (href) {
-                            href = href.replace(/\/$/, '').replace(/^\.\//, '');
-                        }
-                        return href;
-                    })
-                    .filter(href => href && /^v\d+\.\d+\.\d+$/.test(href));
-                
-                // Remover duplicados y ordenar
-                links = [...new Set(links)];
-                links.sort((a, b) => {
-                    // Ordenar por versión descendente
-                    const aVer = a.split('.').map(Number);
-                    const bVer = b.split('.').map(Number);
-                    for (let i = 0; i < 3; i++) {
-                        if (aVer[i] !== bVer[i]) return bVer[i] - aVer[i];
-                    }
-                    return 0;
-                });
-                
-                const releasesDiv = document.getElementById('releases');
-                
-                if (links.length > 0) {
-                    releasesDiv.innerHTML = '';
-                    
-                    links.forEach(version => {
-                        const card = document.createElement('div');
-                        card.className = 'release-card';
-                        card.innerHTML = `
-                            <h2>${version}</h2>
-                            <p>Versión Semántica</p>
-                            <a href="releases/${version}/">Jugar Ahora →</a>
-                        `;
-                        releasesDiv.appendChild(card);
-                    });
-                } else {
-                    console.warn('No se encontraron versiones en el formato esperado');
-                }
-            } catch (error) {
-                console.error('Error al cargar releases:', error);
-            }
-        }
-        
-        // Cargar releases cuando el DOM esté listo
-        document.addEventListener('DOMContentLoaded', loadReleases);
-    </script>
 </body>
 </html>
 EOF
