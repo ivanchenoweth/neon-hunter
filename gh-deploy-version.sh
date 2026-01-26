@@ -148,18 +148,16 @@ fi
 echo ""
 echo "📝 Actualizando index.html con la versión..."
 
-# Preparar el bloque HTML de la versión
-VERSION_HTML="<div id=\"version-info\" class=\"version-info\">\n                <span class=\"version-badge\">${RELEASE_ID}</span>\n                <div class=\"version-meta\">${CURRENT_BRANCH} • ${BUILD_DATE}</div>\n            </div>"
+# Preparar el bloque HTML de la versión con posicionamiento absoluto
+VERSION_HTML="<div id=\"version-info\" style=\"position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 9999; text-align: center;\">\n        <span class=\"version-badge\">${RELEASE_ID}</span>\n        <div class=\"version-meta\">${CURRENT_BRANCH} • ${BUILD_DATE}</div>\n    </div>"
 
 # Eliminar versiones anteriores (limpieza para evitar duplicados o formatos viejos)
 # Esto borra tanto el span solitario viejo como el div nuevo si ya existe
+sed -i.bak '/id="version-info"/,/<\/div>/d' index.html
 sed -i.bak '/id="version-badge"/d' index.html
-sed -i.bak '/class="version-info"/,/<\/div>/d' index.html
 
-# Insertar el nuevo bloque después del h2
-# Usamos un archivo temporal para construir el reemplazo porque insertar múltiples líneas con sed es complicado
-sed -i.bak "s|<h2>Select control mode</h2>|<h2>Select control mode</h2>\\
-            ${VERSION_HTML}|" index.html
+# Insertar el nuevo bloque justo después de la etiqueta <body>
+sed -i.bak "s|<body>|<body>\n    ${VERSION_HTML}|" index.html
 
 # Agregar CSS para el version badge y meta si no existe
 if ! grep -q "\.version-meta" index.html; then
@@ -169,7 +167,7 @@ fi
 # Limpiar archivo de backup
 rm -f index.html.bak
 
-echo "✅ index.html actualizado con: $RELEASE_ID"
+echo "✅ index.html actualizado con: $RELEASE_ID (${CURRENT_BRANCH} • ${BUILD_DATE})"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PASO 4: Commit de los cambios y crear el tag
