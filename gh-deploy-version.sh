@@ -128,12 +128,12 @@ if [ -f "game.js" ]; then
     # Reemplazar cualquier cadena usada como badge en la llamada a ctx.fillText(..., cx, cy - 150)
     # Esto captura tanto formatos con prefijo de versión como los que solo contienen el pet name.
     # Usamos -E (extended regex) para mayor legibilidad.
-    sed -i.bak -E "s/ctx\.fillText\('[^']*'\s*,\s*cx\s*,\s*cy\s*-\s*150\s*\);/ctx.fillText('${RELEASE_ID}', cx, cy - 150);/g" game.js
+    sed -i.bak -E "s/ctx\.fillText\('[^']*'\s*,\s*cx\s*,\s*cy\s*-\s*150\s*\);/ctx.fillText('${RELEASE_ID} (${CURRENT_BRANCH} • ${BUILD_DATE})', cx, cy - 150);/g" game.js
     # Si hubo cambio, commitear; si no, informar
     if ! cmp -s game.js game.js.bak 2>/dev/null; then
         rm -f game.js.bak
         git add game.js
-        git commit -m "chore: embed release id ${RELEASE_ID} in game.js" || echo "ℹ️  No hay cambios nuevos en game.js"
+        git commit -m "chore: embed release info ${RELEASE_ID} (${CURRENT_BRANCH} • ${BUILD_DATE}) in game.js" || echo "ℹ️  No hay cambios nuevos en game.js"
     else
         rm -f game.js.bak
         echo "ℹ️  No se detectaron cambios en game.js"
