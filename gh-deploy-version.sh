@@ -370,17 +370,14 @@ cat > "$INDEX_FILE" << 'EOF'
 EOF
 
 # Agregar versiones (ordenadas de más reciente a más antigua usando sort -V para versionado semántico)
-for d in $(ls "$WORKTREE_DIR/releases"/*/ 2>/dev/null | xargs -I {} basename {} | sort -rV | xargs -I {} find "$WORKTREE_DIR/releases" -maxdepth 1 -type d -name "{}" 2>/dev/null); do
-    if [ -d "$d" ]; then
-        dir_name=$(basename "$d")
-        # Intentar extraer el pet name del archivo .pet-name o del index.html
+# Simplificar el bucle para iterar correctamente sobre los directorios
+if [ -d "$WORKTREE_DIR/releases" ]; then
+    for version_dir in $(find "$WORKTREE_DIR/releases" -maxdepth 1 -type d -name "v*" | sort -rV); do
+        dir_name=$(basename "$version_dir")
+        # Intentar extraer el pet name del archivo .pet-name
         pet_name=""
-        if [ -f "$d/.pet-name" ]; then
-            pet_name=$(cat "$d/.pet-name" 2>/dev/null)
-        fi
-        if [ -z "$pet_name" ] && [ -f "$d/index.html" ]; then
-            # Extraer pet name usando sed (compatible con macOS)
-            pet_name=$(sed -n 's/.*version-badge[^>]*>\([^<]*\)<.*/\1/p' "$d/index.html" 2>/dev/null | head -1 | sed 's/.*-//')
+        if [ -f "$version_dir/.pet-name" ]; then
+            pet_name=$(cat "$version_dir/.pet-name" 2>/dev/null)
         fi
         if [ -z "$pet_name" ]; then
             pet_name="classic"
@@ -396,8 +393,8 @@ for d in $(ls "$WORKTREE_DIR/releases"/*/ 2>/dev/null | xargs -I {} basename {} 
                 </a>
             </li>
 ENTRY
-    fi
-done
+    done
+fi
 
 cat >> "$INDEX_FILE" << 'EOF'
         </ul>
