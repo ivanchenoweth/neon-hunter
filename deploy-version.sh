@@ -51,6 +51,20 @@ WORKTREE_DIR="../neon-hunter-pages-temp"
 CURRENT_BRANCH=$(git branch --show-current)
 BUILD_DATE=$(date +'%Y-%m-%d %H:%M')
 
+# Detectar dinámicamente el repositorio desde el remote
+REPO_URL=$(git remote get-url origin 2>/dev/null || git remote get-url upstream 2>/dev/null)
+# Extraer owner/repo del URL (funciona con https:// y git@)
+if [[ $REPO_URL =~ github\.com[:/]([^/]+)/([^/]+)(\.git)?$ ]]; then
+    GITHUB_OWNER="${BASH_REMATCH[1]}"
+    GITHUB_REPO="${BASH_REMATCH[2]}"
+    GITHUB_PAGES_URL="https://${GITHUB_OWNER}.github.io/${GITHUB_REPO}"
+else
+    # Fallback por defecto
+    GITHUB_OWNER="ivanchenoweth"
+    GITHUB_REPO="neon-hunter"
+    GITHUB_PAGES_URL="https://ivanchenoweth.github.io/neon-hunter"
+fi
+
 echo ""
 
 echo "╔══════════════════════════════════════════════════════════════════════╗"
@@ -60,24 +74,27 @@ echo ""
 echo "📌 Rama actual: $CURRENT_BRANCH"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# PASO 1: Calcular el siguiente tag automáticamente
+# PASO 1: Calcular el siguiente tag automáticamente (SemVer: MAJOR.MINOR.PATCH)
 # ─────────────────────────────────────────────────────────────────────────────
 
 echo ""
-echo "🔍 Buscando versiones existentes..."
+echo "🔍 Buscando versiones existentes (SemVer)..."
 
-# Obtener el último tag que sigue el patrón vX.0
-LAST_TAG=$(git tag --list 'v*.0' --sort=-version:refname | head -1)
+# Obtener el último tag que sigue el patrón vMAJOR.MINOR.PATCH
+LAST_TAG=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-version:refname | head -1)
 
 if [ -z "$LAST_TAG" ]; then
-    # Si no hay tags, empezar desde v1.0
-    NEXT_VERSION="v1.0"
-    NEXT_NUMBER=1
+    # Si no hay tags SemVer, empezar desde v1.0.0
+    NEXT_VERSION="v1.0.0"
 else
-    # Extraer el número de versión y sumar 1
-    CURRENT_NUMBER=$(echo "$LAST_TAG" | sed 's/v\([0-9]*\).*/\1/')
-    NEXT_NUMBER=$((CURRENT_NUMBER + 1))
-    NEXT_VERSION="v${NEXT_NUMBER}.0"
+    # Extraer MAJOR.MINOR.PATCH y incrementar MINOR (nuevas características)
+    MAJOR=$(echo "$LAST_TAG" | sed 's/v\([0-9]*\)\.[0-9]*\.[0-9]*/\1/')
+    MINOR=$(echo "$LAST_TAG" | sed 's/v[0-9]*\.\([0-9]*\)\.[0-9]*/\1/')
+    PATCH=$(echo "$LAST_TAG" | sed 's/v[0-9]*\.[0-9]*\.\([0-9]*\)/\1/')
+    
+    # Incrementar MINOR (compatibilidad con versiones anteriores)
+    NEXT_MINOR=$((MINOR + 1))
+    NEXT_VERSION="v${MAJOR}.${NEXT_MINOR}.0"
 fi
 
 echo "📦 Último tag encontrado: ${LAST_TAG:-ninguno}"
@@ -95,9 +112,33 @@ echo ""
 echo "🐾 Pet Name generado: $PET_NAME"
 echo "🔑 Commit: $SHORT_HASH"
 
-# Crear el identificador completo
-RELEASE_ID="${NEXT_VERSION}-${PET_NAME}"
+# Crear el identificador completo (no dejar guion inicial si NEXT_VERSION está vacío)
+if [ -n "$NEXT_VERSION" ]; then
+    RELEASE_ID="${NEXT_VERSION}-${PET_NAME}"
+else
+    RELEASE_ID="${PET_NAME}"
+fi
 echo "🏷️  Release ID: $RELEASE_ID"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Reemplazar en game.js el string hardcodeado con el Release ID generado
+# ─────────────────────────────────────────────────────────────────────────────
+if [ -f "game.js" ]; then
+    echo "🔁 Actualizando game.js con Release ID: $RELEASE_ID (badge de versión)"
+    # Reemplazar cualquier cadena usada como badge en la llamada a ctx.fillText(..., cx, cy - 150)
+    # Esto captura tanto formatos con prefijo de versión como los que solo contienen el pet name.
+    # Usamos -E (extended regex) para mayor legibilidad.
+    sed -i.bak -E "s/ctx\.fillText\('[^']*'\s*,\s*cx\s*,\s*cy\s*-\s*150\s*\);/ctx.fillText('${RELEASE_ID}', cx, cy - 150);/g" game.js
+    # Si hubo cambio, commitear; si no, informar
+    if ! cmp -s game.js game.js.bak 2>/dev/null; then
+        rm -f game.js.bak
+        git add game.js
+        git commit -m "chore: embed release id ${RELEASE_ID} in game.js" || echo "ℹ️  No hay cambios nuevos en game.js"
+    else
+        rm -f game.js.bak
+        echo "ℹ️  No se detectaron cambios en game.js"
+    fi
+fi
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PASO 3: Actualizar index.html con la información de la versión
@@ -177,7 +218,7 @@ if command -v gh &> /dev/null; then
 **Branch:** ${CURRENT_BRANCH}
 **Commit:** ${SHORT_HASH}
 
-🌐 [Play this version](https://ivanchenoweth.github.io/neon-hunter/releases/${NEXT_VERSION}/)" \
+🌐 [Play this version](${GITHUB_PAGES_URL}/releases/${NEXT_VERSION}/)" \
         --target "$CURRENT_BRANCH" 2>/dev/null && echo "✅ GitHub Release creado" || echo "⚠️  No se pudo crear GitHub Release (puede requerir permisos adicionales)"
 else
     echo "⚠️  gh CLI no disponible, saltando creación de GitHub Release"
@@ -397,8 +438,8 @@ echo "  🌿 Rama:       $CURRENT_BRANCH"
 echo "  🔑 Commit:     $SHORT_HASH"
 echo ""
 echo "  🌐 URL del release:"
-echo "     https://ivanchenoweth.github.io/neon-hunter/releases/$NEXT_VERSION/"
+echo "     ${GITHUB_PAGES_URL}/releases/$NEXT_VERSION/"
 echo ""
 echo "  📋 Índice de versiones:"
-echo "     https://ivanchenoweth.github.io/neon-hunter/"
+echo "     ${GITHUB_PAGES_URL}/"
 echo ""
