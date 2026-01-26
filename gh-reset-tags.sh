@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # ==============================================================================
-# reset-tags.sh
-# Script para limpiar tags viejos antes de migrar a SemVer
-# Esto permite empezar de cero con versionado semántico (v1.0.0, v1.1.0, etc.)
+# gh-reset-tags.sh
+# Script para limpiar tags viejos de Git (local y remoto)
+# Elimina TODOS los tags que comienzan con 'v' (v1.0.0, v1.1.0, etc.)
 # ==============================================================================
 
 set -e
@@ -18,9 +18,9 @@ echo ""
 # PASO 1: Listar y confirmar los tags viejos a eliminar
 # ─────────────────────────────────────────────────────────────────────────────
 
-echo "📋 Tags actuales (formato viejo v*.0 o vX.0):"
+echo "📋 Tags actuales en Git:"
 echo ""
-git tag --list 'v*' --sort=-version:refname | head -20 || echo "   (Sin tags)"
+git tag --list 'v*' --sort=-version:refname || echo "   (Sin tags)"
 echo ""
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -46,15 +46,16 @@ echo ""
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Generar lista dinámica de tags a eliminar
-OLD_TAGS=$(git tag --list 'v[0-9]*' --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]?$' || true)
+# Busca todos los tags que comienzan con 'v' (cualquier formato SemVer)
+OLD_TAGS=$(git tag --list 'v*' --sort=-version:refname || true)
 
 if [ -z "$OLD_TAGS" ]; then
-    echo "ℹ️  No se encontraron tags con formato viejo (v*.0)"
+    echo "ℹ️  No se encontraron tags para eliminar"
 else
     echo "📍 Eliminando localmente:"
-    for tag in $OLD_TAGS; do
+    echo "$OLD_TAGS" | while read tag; do
         echo "   - Eliminando $tag (local)"
-        git tag -d "$tag" 2>/dev/null || true
+        git tag -d "$tag" 2>/dev/null || echo "   ⚠️  No se pudo eliminar $tag localmente"
     done
 fi
 
@@ -68,9 +69,9 @@ if [ -z "$OLD_TAGS" ]; then
     echo "ℹ️  No hay tags remotos para eliminar"
 else
     echo "☁️  Eliminando del remoto (origin):"
-    for tag in $OLD_TAGS; do
+    echo "$OLD_TAGS" | while read tag; do
         echo "   - Eliminando $tag (remoto)"
-        git push origin ":$tag" 2>/dev/null || git push --delete origin "$tag" 2>/dev/null || true
+        git push --delete origin "$tag" 2>/dev/null || git push origin ":$tag" 2>/dev/null || echo "   ⚠️  No se pudo eliminar $tag del remoto"
     done
 fi
 
