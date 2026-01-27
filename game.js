@@ -426,7 +426,7 @@ class Game {
         ctx.shadowBlur = 0;
         ctx.font = 'bold 16px "Outfit", sans-serif';
         ctx.fillStyle = '#00ff88';
-        ctx.fillText('v1.12.0-storm-warrior (feat/32-warps-and-enemies-count • 2026-01-26 12:46)', cx, cy - 150); // VERSION_BADGE
+        ctx.fillText('v1.0.0-flame-dragon (feat/32-warps-and-enemies-count • 2026-01-26 19:37)', cx, cy - 150); // VERSION_BADGE
 
         // Zoom Controls
         ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
