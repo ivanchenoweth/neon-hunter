@@ -119,6 +119,9 @@ class Game {
 
         this.lastTime = 0;
         this.loop = this.loop.bind(this);
+
+        // Center camera on player immediately
+        this.camera.follow(this.player, 0);
     }
 
     handleResize() {
@@ -205,30 +208,24 @@ class Game {
         });
 
         // Draw spawn area on minimap (where enemies appear)
-        const spawnMinDistance = 600;
-        const spawnMaxDistance = 1000;
-        const px = centerX + this.player.x * scale;
-        const py = centerY + this.player.y * scale;
+        // Consistent with Enemy.js: marginW=150, marginH=150
+        const marginW = 150;
+        const marginH = 150;
+        const viewW = this.camera.width / this.camera.zoom;
+        const viewH = this.camera.height / this.camera.zoom;
 
-        // Draw outer spawn ring (max distance)
-        ctx.strokeStyle = 'rgba(255, 100, 100, 0.3)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.arc(px, py, spawnMaxDistance * scale, 0, Math.PI * 2);
-        ctx.stroke();
+        const spawnX = centerX + (this.camera.x - marginW) * scale;
+        const spawnY = centerY + (this.camera.y - marginH) * scale;
+        const spawnW = (viewW + 2 * marginW) * scale;
+        const spawnH = (viewH + 2 * marginH) * scale;
 
-        // Draw inner spawn ring (min distance)
         ctx.strokeStyle = 'rgba(255, 100, 100, 0.5)';
-        ctx.beginPath();
-        ctx.arc(px, py, spawnMinDistance * scale, 0, Math.PI * 2);
-        ctx.stroke();
+        ctx.lineWidth = 1;
+        ctx.strokeRect(spawnX, spawnY, spawnW, spawnH);
 
-        // Fill the spawn ring area with semi-transparent red (between inner and outer rings only)
-        ctx.fillStyle = 'rgba(255, 100, 100, 0.25)';
-        ctx.beginPath();
-        ctx.arc(px, py, spawnMaxDistance * scale, 0, Math.PI * 2);
-        ctx.arc(px, py, spawnMinDistance * scale, 0, Math.PI * 2, true); // Counter-clockwise to create donut
-        ctx.fill('evenodd');
+        // Fill spawn area with very light transparency as requested
+        ctx.fillStyle = 'rgba(255, 100, 100, 0.15)';
+        ctx.fillRect(spawnX, spawnY, spawnW, spawnH);
 
         // Draw camera viewport on minimap
         const vx = centerX + this.camera.x * scale;
@@ -241,9 +238,8 @@ class Game {
 
         // Draw player on minimap
         ctx.fillStyle = '#fff';
-        // ctx.beginPath();
-        // ctx.arc(px, py, 3, 0, Math.PI * 2);
-        // ctx.fill();
+        const px = centerX + this.player.x * scale;
+        const py = centerY + this.player.y * scale;
         ctx.fillRect(px - 1.5, py - 1.5, 3, 3);
 
         // Draw enemies on minimap
@@ -410,6 +406,14 @@ class Game {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
         ctx.fillRect(0, 0, this.width, this.height);
 
+        // UI Scaling Factor (Relative to 1080p base height)
+        const scale = Math.max(0.5, this.height / 1080);
+        const titleSize = Math.floor(60 * scale);
+        const versionSize = Math.floor(16 * scale);
+        const instructionSize = Math.floor(20 * scale);
+        const buttonTextSize = Math.floor(18 * scale);
+        const spacing = 70 * scale;
+
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         const cx = this.width / 2;
@@ -417,65 +421,71 @@ class Game {
 
         // Title
         ctx.fillStyle = '#00ff88';
-        ctx.font = 'bold 60px "Outfit", sans-serif';
-        ctx.shadowBlur = 20;
+        ctx.font = `bold ${titleSize}px "Outfit", sans-serif`;
+        ctx.shadowBlur = 20 * scale;
         ctx.shadowColor = '#00ff88';
-        ctx.fillText('NEON HUNTER', cx, cy - 200);
+        ctx.fillText('NEON HUNTER', cx, cy - 200 * scale);
 
         // Version Badge
         ctx.shadowBlur = 0;
-        ctx.font = 'bold 16px "Outfit", sans-serif';
+        ctx.font = `bold ${versionSize}px "Outfit", sans-serif`;
         ctx.fillStyle = '#00ff88';
-        ctx.fillText('v1.4.0-storm-viper (main • 2026-01-26 01:09)', cx, cy - 150);
-
-        // Zoom Controls
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-        ctx.font = 'bold 20px "Outfit", sans-serif';
-        // ctx.fillText('Zoom:', cx - 100, cy - 100);
+        ctx.fillText('v1.6.0-silver-tiger (main • 2026-01-26 02:30)', cx, cy - 150 * scale);
 
         // Zoom Out Button
         const bZoomOut = this.btnBounds.zoomOut;
-        bZoomOut.x = cx - 40 - bZoomOut.w;
-        bZoomOut.y = cy - 120;
-        this.drawButton(ctx, bZoomOut, '-', '#ff8500', this.menuSelection === 0);
+        bZoomOut.w = 50 * scale;
+        bZoomOut.h = 40 * scale;
+        bZoomOut.x = cx - 40 * scale - bZoomOut.w;
+        bZoomOut.y = cy - 120 * scale;
+        this.drawButton(ctx, bZoomOut, '-', '#ff8500', this.menuSelection === 0, buttonTextSize);
 
         // Zoom Level Display
         ctx.fillStyle = '#00ff88';
-        ctx.font = 'bold 20px "Outfit", sans-serif';
-        ctx.fillText(`${window.zoomLevel.toFixed(1)}x`, cx, cy - 100);
+        ctx.font = `bold ${20 * scale}px "Outfit", sans-serif`;
+        ctx.fillText(`${window.zoomLevel.toFixed(1)}x`, cx, cy - 100 * scale);
 
         // Zoom In Button
         const bZoomIn = this.btnBounds.zoomIn;
-        bZoomIn.x = cx + 40;
-        bZoomIn.y = cy - 120;
-        this.drawButton(ctx, bZoomIn, '+', '#ff8500', this.menuSelection === 1);
+        bZoomIn.w = 50 * scale;
+        bZoomIn.h = 40 * scale;
+        bZoomIn.x = cx + 40 * scale;
+        bZoomIn.y = cy - 120 * scale;
+        this.drawButton(ctx, bZoomIn, '+', '#ff8500', this.menuSelection === 1, buttonTextSize);
 
         // Instruction
         ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-        ctx.font = '20px "Outfit", sans-serif';
-        ctx.fillText('Choose how you want to play:', cx, cy - 40);
+        ctx.font = `${instructionSize}px "Outfit", sans-serif`;
+        ctx.fillText('Choose how you want to play:', cx, cy - 40 * scale);
 
         // Mode Buttons
+        const btnW = 220 * scale;
+        const btnH = 50 * scale;
+
         const bTouch = this.btnBounds.modeTouch;
-        bTouch.x = cx - bTouch.w / 2;
+        bTouch.w = btnW; bTouch.h = btnH;
+        bTouch.x = cx - btnW / 2;
         bTouch.y = cy;
-        this.drawButton(ctx, bTouch, 'Touch Joysticks', '#00ff88', this.menuSelection === 2);
+        this.drawButton(ctx, bTouch, 'Touch Joysticks', '#00ff88', this.menuSelection === 2, buttonTextSize);
 
         const bKeyboard = this.btnBounds.modeKeyboard;
-        bKeyboard.x = cx - bKeyboard.w / 2;
-        bKeyboard.y = cy + 70;
-        this.drawButton(ctx, bKeyboard, 'WASD + Mouse', '#00d4ff', this.menuSelection === 3);
+        bKeyboard.w = btnW; bKeyboard.h = btnH;
+        bKeyboard.x = cx - btnW / 2;
+        bKeyboard.y = cy + spacing;
+        this.drawButton(ctx, bKeyboard, 'WASD + Mouse', '#00d4ff', this.menuSelection === 3, buttonTextSize);
 
         const bKeyboardFire = this.btnBounds.modeKeyboardFire;
-        bKeyboardFire.x = cx - bKeyboardFire.w / 2;
-        bKeyboardFire.y = cy + 140;
-        this.drawButton(ctx, bKeyboardFire, 'WASD + IJLK', '#ff00ff', this.menuSelection === 4);
+        bKeyboardFire.w = btnW; bKeyboardFire.h = btnH;
+        bKeyboardFire.x = cx - btnW / 2;
+        bKeyboardFire.y = cy + 2 * spacing;
+        this.drawButton(ctx, bKeyboardFire, 'WASD + IJLK', '#ff00ff', this.menuSelection === 4, buttonTextSize);
 
         ctx.restore();
     }
 
-    drawButton(ctx, bounds, text, color, highlight = false) {
+    drawButton(ctx, bounds, text, color, highlight = false, fontSize = 18) {
         ctx.save();
+        const borderRadius = 15;
         if (highlight) {
             ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
             ctx.lineWidth = 4;
@@ -489,13 +499,13 @@ class Game {
 
         ctx.strokeStyle = color;
         ctx.beginPath();
-        if (ctx.roundRect) ctx.roundRect(bounds.x, bounds.y, bounds.w, bounds.h, 15);
+        if (ctx.roundRect) ctx.roundRect(bounds.x, bounds.y, bounds.w, bounds.h, borderRadius);
         else ctx.rect(bounds.x, bounds.y, bounds.w, bounds.h);
         ctx.fill();
         ctx.stroke();
 
         ctx.fillStyle = color;
-        ctx.font = 'bold 18px "Outfit", sans-serif';
+        ctx.font = `bold ${fontSize}px "Outfit", sans-serif`;
         if (!highlight) {
             ctx.shadowBlur = 10;
             ctx.shadowColor = color;
@@ -509,33 +519,44 @@ class Game {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
         ctx.fillRect(0, 0, this.width, this.height);
 
+        const scale = Math.max(0.5, this.height / 1080);
+        const titleSize = Math.floor(60 * scale);
+        const statsSize = Math.floor(30 * scale);
+        const buttonTextSize = Math.floor(18 * scale);
+        const spacing = 80 * scale;
+
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
 
         ctx.fillStyle = '#ff4444';
-        ctx.font = 'bold 60px "Outfit", sans-serif';
-        ctx.shadowBlur = 20;
+        ctx.font = `bold ${titleSize}px "Outfit", sans-serif`;
+        ctx.shadowBlur = 20 * scale;
         ctx.shadowColor = '#ff4444';
-        ctx.fillText('GAME OVER', this.width / 2, this.height / 2 - 120);
+        ctx.fillText('GAME OVER', this.width / 2, this.height / 2 - 120 * scale);
 
         ctx.shadowBlur = 0;
         ctx.fillStyle = '#fff';
-        ctx.font = '30px "Outfit", sans-serif';
-        ctx.fillText(`Final Score: ${this.score}`, this.width / 2, this.height / 2 - 40);
-        ctx.fillText(`Coins Collected: ${this.coins}`, this.width / 2, this.height / 2 + 10);
+        ctx.font = `${statsSize}px "Outfit", sans-serif`;
+        ctx.fillText(`Final Score: ${this.score}`, this.width / 2, this.height / 2 - 40 * scale);
+        ctx.fillText(`Coins Collected: ${this.coins}`, this.width / 2, this.height / 2 + 10 * scale);
+
+        const btnW = 200 * scale;
+        const btnH = 60 * scale;
 
         const b = this.btnBounds.restart;
+        b.w = btnW; b.h = btnH;
         b.x = this.width / 2 - b.w / 2;
-        b.y = this.height / 2 + 80;
+        b.y = this.height / 2 + spacing;
 
-        this.drawButton(ctx, b, 'TRY AGAIN', '#00ff88', this.menuSelection === 0);
+        this.drawButton(ctx, b, 'TRY AGAIN', '#00ff88', this.menuSelection === 0, buttonTextSize);
 
         // Main Menu Button
         const bMenu = this.btnBounds.mainMenu;
+        bMenu.w = btnW; bMenu.h = btnH;
         bMenu.x = this.width / 2 - bMenu.w / 2;
-        bMenu.y = b.y + 80;
+        bMenu.y = b.y + spacing;
 
-        this.drawButton(ctx, bMenu, 'MAIN MENU', '#00d4ff', this.menuSelection === 1);
+        this.drawButton(ctx, bMenu, 'MAIN MENU', '#00d4ff', this.menuSelection === 1, buttonTextSize);
 
         ctx.restore();
     }
@@ -701,13 +722,13 @@ class Game {
         const right = this.input.keys.d || this.input.keys.arrowright || (this.input.joystickLeft && this.input.joystickLeft.x > 0.5);
         const select = this.input.keys.space;
 
-        if (up || down || left || right || select) {
-            // this.tryEnterFullscreen(); // Reverted as per user request
-        }
+        // Skip joystick/keyboard navigation if input mode is 'touch'
+        // as buttons can be clicked/touched directly.
+        const isTouchMode = window.inputMode === 'touch';
 
         if (this.gameState === this.states.INITIAL) {
             // Indices: 0:ZoomOut, 1:ZoomIn, 2:Touch, 3:WASD+Mouse, 4:WASD+IJLK
-            if (this.menuCooldown === 0) {
+            if (this.menuCooldown === 0 && !isTouchMode) {
                 if (up) {
                     if (this.menuSelection > 1) this.menuSelection--; // Move up list
                     else if (this.menuSelection <= 1) { /* Stay in row 0 */ }
@@ -778,7 +799,7 @@ class Game {
 
         } else if (this.gameState === this.states.GAME_OVER) {
             // Indices: 0: Try Again, 1: Main Menu
-            if (this.menuCooldown === 0) {
+            if (this.menuCooldown === 0 && !isTouchMode) {
                 if (up || down) {
                     this.menuSelection = this.menuSelection === 0 ? 1 : 0;
                     this.menuCooldown = 200;
@@ -827,12 +848,19 @@ class Game {
     }
 
     isOffScreen(entity) {
-        const margin = entity.size || 50;
+        // MUST use zoomed viewport dimensions. 
+        // Viewport width in world space is this.width / this.camera.zoom
+        const viewW = this.width / this.camera.zoom;
+        const viewH = this.height / this.camera.zoom;
+
+        // Reset margin MUST be larger than spawn margin (800 in Enemy.js)
+        const resetMargin = 1500;
+
         return (
-            entity.x + margin < this.camera.x ||
-            entity.x - margin > this.camera.x + this.width ||
-            entity.y + margin < this.camera.y ||
-            entity.y - margin > this.camera.y + this.height
+            entity.x < this.camera.x - resetMargin ||
+            entity.x > this.camera.x + viewW + resetMargin ||
+            entity.y < this.camera.y - resetMargin ||
+            entity.y > this.camera.y + viewH + resetMargin
         );
     }
 

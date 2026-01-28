@@ -128,7 +128,7 @@ if [ -f "game.js" ]; then
     # Reemplazar cualquier cadena usada como badge en la llamada a ctx.fillText(..., cx, cy - 150)
     # Esto captura tanto formatos con prefijo de versión como los que solo contienen el pet name.
     # Usamos -E (extended regex) para mayor legibilidad.
-    sed -i.bak -E "s/ctx\.fillText\('[^']*'\s*,\s*cx\s*,\s*cy\s*-\s*150\s*\);/ctx.fillText('${RELEASE_ID} (${CURRENT_BRANCH} • ${BUILD_DATE})', cx, cy - 150);/g" game.js
+    sed -i.bak -E "s|ctx\.fillText\('[^']*'\s*,\s*cx\s*,\s*cy\s*-\s*150\s*\);|ctx.fillText('${RELEASE_ID} (${CURRENT_BRANCH} • ${BUILD_DATE})', cx, cy - 150);|g" game.js
     # Si hubo cambio, commitear; si no, informar
     if ! cmp -s game.js game.js.bak 2>/dev/null; then
         rm -f game.js.bak
@@ -153,17 +153,18 @@ VERSION_HTML="<div id=\"version-info\" style=\"position: absolute; top: 10px; le
 
 # Eliminar versiones anteriores (limpieza para evitar duplicados o formatos viejos)
 # Esto borra tanto el span solitario viejo como el div nuevo si ya existe
-sed -i.bak '/id="version-info"/,/<\/div>/d' index.html
-sed -i.bak '/id="version-badge"/d' index.html
+sed -i.bak '\|id="version-info"|,\|</div>|d' index.html
+sed -i.bak '\|id="version-badge"|d' index.html
 
 # Insertar el nuevo bloque justo después de la etiqueta <body>
 sed -i.bak "s|<body>|<body>\n    ${VERSION_HTML}|" index.html
 
 # Agregar CSS para el version badge y meta si no existe
 if ! grep -q "\.version-meta" index.html; then
-    sed -i.bak 's|</style>|        .version-info {\n            display: flex;\n            flex-direction: column;\n            align-items: center;\n            margin-bottom: 15px;\n        }\n        .version-badge {\n            display: inline-block;\n            background: linear-gradient(135deg, rgba(0,255,136,0.2), rgba(0,200,100,0.1));\n            border: 1px solid rgba(0,255,136,0.3);\n            color: #00ff88;\n            padding: 4px 12px;\n            border-radius: 20px;\n            font-size: 11px;\n            font-weight: 600;\n            letter-spacing: 0.5px;\n            text-shadow: 0 0 10px rgba(0,255,136,0.5);\n            margin-bottom: 4px;\n        }\n        .version-meta {
-            display: block;
-            font-size: 10px;\n            color: rgba(255,255,255,0.7);\n            font-weight: 400;\n            font-family: monospace;\n        }\n    </style>|g' index.html
+    CSS_BLOCK="        .version-info {\n            display: flex;\n            flex-direction: column;\n            align-items: center;\n            margin-bottom: 15px;\n        }\n        .version-badge {\n            display: inline-block;\n            background: linear-gradient(135deg, rgba(0,255,136,0.2), rgba(0,200,100,0.1));\n            border: 1px solid rgba(0,255,136,0.3);\n            color: #00ff88;\n            padding: 4px 12px;\n            border-radius: 20px;\n            font-size: 11px;\n            font-weight: 600;\n            letter-spacing: 0.5px;\n            text-shadow: 0 0 10px rgba(0,255,136,0.5);\n            margin-bottom: 4px;\n        }\n        .version-meta {\n            display: block;\n            font-size: 10px;\n            color: rgba(255,255,255,0.7);\n            font-weight: 400;\n            font-family: monospace;\n        }"
+    
+    # Insertar el bloque CSS antes del cierre del estilo
+    sed -i.bak "/<\/style>/i $CSS_BLOCK" index.html
 fi
 
 # Limpiar archivo de backup

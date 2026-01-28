@@ -40,37 +40,33 @@ class Background {
     }
 
     draw(ctx) {
-        // Draw grid using pattern
         ctx.save();
-        // Translate pattern match camera
-        ctx.fillStyle = this.gridPattern;
-
-        // Offset pattern to align with camera
-        const offsetX = -this.game.camera.x;
-        const offsetY = -this.game.camera.y;
-
-        ctx.translate(this.game.camera.x, this.game.camera.y);
-        ctx.fillRect(0, 0, this.game.width, this.game.height);
-        ctx.restore();
-
-        // Draw stars - Constant color, minimize fillRect calls, with culling
-        ctx.fillStyle = '#fff';
+        // Since ctx is already translated by -camera.x, -camera.y in Game.js
+        // We just need to fill the current camera viewport in world space.
         const camX = this.game.camera.x;
         const camY = this.game.camera.y;
-        const camW = this.game.width;
-        const camH = this.game.height;
+        const viewW = this.game.width / this.game.camera.zoom;
+        const viewH = this.game.height / this.game.camera.zoom;
 
+        // Draw grid using pattern
+        ctx.fillStyle = this.gridPattern;
+        // The pattern handles its own tiling, but we must specify the world-coordinates to fill
+        ctx.fillRect(camX, camY, viewW, viewH);
+
+        // Draw stars
+        ctx.fillStyle = '#fff';
         this.stars.forEach(star => {
+            // Stars are in world space, we check if they are in the zoomed viewport
             if (
                 star.x >= camX &&
-                star.x <= camX + camW &&
+                star.x <= camX + viewW &&
                 star.y >= camY &&
-                star.y <= camY + camH
+                star.y <= camY + viewH
             ) {
                 ctx.globalAlpha = star.alpha;
                 ctx.fillRect(star.x, star.y, star.size, star.size);
             }
         });
-        ctx.globalAlpha = 1;
+        ctx.restore();
     }
 }

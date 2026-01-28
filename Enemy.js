@@ -6,11 +6,8 @@ class Enemy {
         this.color = '#ff4444';
         this.markedForDeletion = false;
 
-        // Spawn somewhere around the player but at a distance
-        const angle = Math.random() * Math.PI * 2;
-        const distance = 600 + Math.random() * 400; // Between 600 and 1000 units away
-        this.x = this.game.player.x + Math.cos(angle) * distance;
-        this.y = this.game.player.y + Math.sin(angle) * distance;
+        // Spawn in a rectangular area around the player
+        this._setRectangularSpawnPosition();
 
         // Clamp to world bounds
         const halfW = this.game.worldWidth / 2;
@@ -121,10 +118,7 @@ class Enemy {
         this.game = game;
         this.markedForDeletion = false;
 
-        const angle = Math.random() * Math.PI * 2;
-        const distance = 600 + Math.random() * 400;
-        this.x = this.game.player.x + Math.cos(angle) * distance;
-        this.y = this.game.player.y + Math.sin(angle) * distance;
+        this._setRectangularSpawnPosition();
 
         const halfW = this.game.worldWidth / 2;
         const halfH = this.game.worldHeight / 2;
@@ -135,38 +129,55 @@ class Enemy {
         this._adjustSpawnIntoView();
     }
 
-    _adjustSpawnIntoView() {
-        // Try to nudge spawn so it isn't far outside the camera view after orientation changes.
-        if (!this.game || !this.game.camera) return;
+    /**
+     * Helper to set position on the edges of a rectangle around the player/camera
+     */
+    _setRectangularSpawnPosition() {
         const cam = this.game.camera;
-        const margin = Math.max(this.size, 200);
+        const viewW = cam.width / cam.zoom;
+        const viewH = cam.height / cam.zoom;
 
-        // Convert world pos to screen-relative coords
-        const screenX = this.x - cam.x;
-        const screenY = this.y - cam.y;
+        // Reduced margins to bring spawning closer to the visible area
+        const marginW = 150;
+        const marginH = 150;
 
-        // If within extended view, keep
-        if (screenX >= -margin && screenX <= cam.width + margin && screenY >= -margin && screenY <= cam.height + margin) {
-            return;
+        const side = Math.floor(Math.random() * 4); // 0: Top, 1: Bottom, 2: Left, 3: Right
+
+        // Broaden the ranges to include the corner areas (points outside the screen-corners)
+        switch (side) {
+            case 0: // Top edge (including corners)
+                this.x = cam.x - marginW + Math.random() * (viewW + 2 * marginW);
+                this.y = cam.y - marginH;
+                break;
+            case 1: // Bottom edge (including corners)
+                this.x = cam.x - marginW + Math.random() * (viewW + 2 * marginW);
+                this.y = cam.y + viewH + marginH;
+                break;
+            case 2: // Left edge (including corners)
+                this.x = cam.x - marginW;
+                this.y = cam.y - marginH + Math.random() * (viewH + 2 * marginH);
+                break;
+            case 3: // Right edge (including corners)
+                this.x = cam.x + viewW + marginW;
+                this.y = cam.y - marginH + Math.random() * (viewH + 2 * marginH);
+                break;
         }
 
-        // Otherwise attempt a few times to pick a spawn that lands within extended view
-        for (let i = 0; i < 8; i++) {
-            const angle = Math.random() * Math.PI * 2;
-            const distance = 400 + Math.random() * 600; // try somewhat closer ranges too
-            const nx = this.game.player.x + Math.cos(angle) * distance;
-            const ny = this.game.player.y + Math.sin(angle) * distance;
-            const nxScreen = nx - cam.x;
-            const nyScreen = ny - cam.y;
-            if (nxScreen >= -margin && nxScreen <= cam.width + margin && nyScreen >= -margin && nyScreen <= cam.height + margin) {
-                this.x = nx; this.y = ny; return;
-            }
-        }
+        // Clamp to world bounds
+        const halfW = this.game.worldWidth / 2;
+        const halfH = this.game.worldHeight / 2;
+        this.x = Math.max(-halfW, Math.min(halfW, this.x));
+        this.y = Math.max(-halfH, Math.min(halfH, this.y));
+    }
 
-        // As a fallback, clamp to just inside world bounds near player's edge of view
-        const fallbackAngle = Math.atan2(this.y - this.game.player.y, this.x - this.game.player.x);
-        const fallbackDist = Math.min(Math.max(500, Math.hypot(this.x - this.game.player.x, this.y - this.game.player.y)), 900);
-        this.x = this.game.player.x + Math.cos(fallbackAngle) * fallbackDist;
-        this.y = this.game.player.y + Math.sin(fallbackAngle) * fallbackDist;
+    _adjustSpawnIntoView() {
+        // With rectangular spawn directly based on camera, 
+        // this is mostly covered by _setRectangularSpawnPosition.
+        // We just ensure it's not exactly on top of the player.
+        const dx = this.x - this.game.player.x;
+        const dy = this.y - this.game.player.y;
+        if (Math.abs(dx) < 100 && Math.abs(dy) < 100) {
+            this._setRectangularSpawnPosition();
+        }
     }
 }

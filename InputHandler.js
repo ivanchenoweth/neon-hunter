@@ -12,33 +12,60 @@ class InputHandler {
             p: false,
             space: false,
             arrowleft: false,
-            arrowdown: false
+            arrowdown: false,
+            arrowup: false,
+            arrowright: false
         };
 
-        // Respect input mode: default to 'keyboard' if not set
-        const mode = window.inputMode || 'keyboard';
         this.mouse = { x: 0, y: 0 };
         this.mouseDown = false;
 
-        if (mode === 'keyboard' || mode === 'keyboardFire') {
-            window.addEventListener('keydown', (e) => this.handleKeyDown(e));
-            window.addEventListener('keyup', (e) => this.handleKeyUp(e));
-
-            // For keyboardFire mode, don't use mouse
-            if (mode === 'keyboard') {
-                window.addEventListener('mousemove', (e) => {
-                    this.mouse.x = e.clientX;
-                    this.mouse.y = e.clientY;
-                });
-                window.addEventListener('mousedown', () => this.mouseDown = true);
-                window.addEventListener('mouseup', () => this.mouseDown = false);
-            }
-        }
+        // Binding methods
+        this._onKeyDown = this.handleKeyDown.bind(this);
+        this._onKeyUp = this.handleKeyUp.bind(this);
+        this._onMouseMove = (e) => {
+            this.mouse.x = e.clientX;
+            this.mouse.y = e.clientY;
+        };
+        this._onMouseDown = () => this.mouseDown = true;
+        this._onMouseUp = () => this.mouseDown = false;
 
         // Virtual joysticks (multitouch)
         this.joystickLeft = { x: 0, y: 0, active: false };
         this.joystickRight = { x: 0, y: 0, active: false };
+
+        // Setup listeners based on current mode
+        this.setupListeners();
+
+        // Re-setup when mode changes
+        window.addEventListener('inputModeChanged', () => {
+            console.log('Input mode changed, re-setting listeners');
+            this.setupListeners();
+        });
+
         this._startJoystickPoll();
+    }
+
+    setupListeners() {
+        // Remove existing to avoid duplicates
+        window.removeEventListener('keydown', this._onKeyDown);
+        window.removeEventListener('keyup', this._onKeyUp);
+        window.removeEventListener('mousemove', this._onMouseMove);
+        window.removeEventListener('mousedown', this._onMouseDown);
+        window.removeEventListener('mouseup', this._onMouseUp);
+
+        const mode = window.inputMode || 'keyboard';
+
+        if (mode === 'keyboard' || mode === 'keyboardFire') {
+            window.addEventListener('keydown', this._onKeyDown);
+            window.addEventListener('keyup', this._onKeyUp);
+
+            if (mode === 'keyboard') {
+                window.addEventListener('mousemove', this._onMouseMove);
+                window.addEventListener('mousedown', this._onMouseDown);
+                window.addEventListener('mouseup', this._onMouseUp);
+            }
+        }
     }
 
     handleKeyDown(e) {
