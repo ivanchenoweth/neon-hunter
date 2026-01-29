@@ -126,6 +126,7 @@ class Game {
         this.enemiesSpawnedInLevel = 0;
         this.warpMessageTimer = 0; // Don't show on load
         this.warpMessageDuration = 3000;
+        this.warpTimer = 0; // ms passed in current warp
 
         this.lastTime = 0;
         this.loop = this.loop.bind(this);
@@ -284,6 +285,7 @@ class Game {
         this.warpLevelKillCount = 0;
         this.enemiesSpawnedInLevel = 0;
         this.warpMessageTimer = 3000; // Show "WARP 1" on start
+        this.warpTimer = 0;
         this.player.resetSpawnAnimation();
 
         // Hide overlays if present
@@ -632,6 +634,32 @@ class Game {
 
         // 2. Actualizar Entidades (Lógica autoritativa)
         const movementInfo = this.player.updateState(deltaTime, this.input);
+
+        // 2.1 Speed Escalation Logic (Warp Timer > 30s)
+        // We do this BEFORE updating enemies so they use the new speed this frame.
+        if (this.warpTimer > 30000) {
+            const timeOverSeconds = (this.warpTimer - 30000) / 1000;
+
+            this.enemies.forEach(enemy => {
+                const dx = this.player.x - enemy.x;
+                const dy = this.player.y - enemy.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                // Formula: baseSpeed * (1 + timeFactor * distFactor)
+                // timeFactor: Quadratic growth - (timeOverSeconds / 5)^2 (Balanced for pressure)
+                const timeFactor = Math.pow(timeOverSeconds / 5, 2);
+
+                // distFactor: 0.2 base + 0.8 scaling by distance (closer enemies still get 20% of the boost)
+                const distFactor = 0.2 + 0.8 * Math.min(1, dist / 1500);
+
+                enemy.speed = enemy.baseSpeed * (1 + timeFactor * distFactor);
+            });
+        } else {
+            // Ensure speeds are normal if timer is below 30s
+            this.enemies.forEach(enemy => {
+                enemy.speed = enemy.baseSpeed;
+            });
+        }
 
         this.enemies.forEach(enemy => enemy.updateState(deltaTime));
         this.bullets.forEach(bullet => bullet.updateState(deltaTime));
@@ -1008,6 +1036,10 @@ class Game {
             this.updateMenu(deltaTime);
         }
 
+        if (this.gameState === this.states.PLAYING) {
+            this.warpTimer += deltaTime;
+        }
+
         const movementInfo = this.updateState(deltaTime);
         this.updateVisuals(deltaTime, movementInfo);
 
@@ -1114,15 +1146,34 @@ class Game {
         this.ctx.font = 'bold 20px "Outfit", sans-serif';
         this.ctx.fillText(`FPS: ${this.fps}`, 20, 30);
         this.ctx.fillText(`Enemies Destroyed: ${this.enemiesDestroyed}`, 20, 60);
-        this.ctx.fillText(`Enemies: ${this.enemies.length} / Visible: ${visibleEnemies}`, 20, 90);
+
+        // Warp Timer
+        const seconds = Math.floor(this.warpTimer / 1000);
+        const mm = Math.floor(seconds / 60).toString().padStart(2, '0');
+        const ss = (seconds % 60).toString().padStart(2, '0');
+
+        if (this.warpTimer > 30000) this.ctx.fillStyle = '#ff4444'; // Red after 30s
+        else this.ctx.fillStyle = '#00ff88';
+        this.ctx.fillText(`Warp Time: ${mm}:${ss}`, 20, 90);
+
+        this.ctx.fillStyle = '#00ff88';
+        this.ctx.fillText(`Enemies: ${this.enemies.length} / Visible: ${visibleEnemies}`, 20, 120);
+
+        // Speed Labels
+        const maxEnemySpeed = this.enemies.reduce((max, e) => Math.max(max, e.speed), 0);
+        this.ctx.fillStyle = '#00d4ff';
+        this.ctx.fillText(`Ship Speed: ${Math.round(this.player.speed)}`, 20, 150);
+        this.ctx.fillStyle = '#ff4444';
+        this.ctx.fillText(`Max Enemy Speed: ${Math.round(maxEnemySpeed)}`, 20, 180);
+
         this.ctx.fillStyle = '#ffff00';
-        this.ctx.fillText(`Coins: ${this.coins}`, 20, 120);
+        this.ctx.fillText(`Coins: ${this.coins}`, 20, 210);
         this.ctx.fillStyle = '#00ccff';
-        this.ctx.fillText(`Score: ${this.score}`, 20, 150);
+        this.ctx.fillText(`Score: ${this.score}`, 20, 240);
 
         // Health Indicator
         this.ctx.fillStyle = '#ff4444';
-        this.ctx.fillText(`Lives: ${'❤️'.repeat(this.lives)}`, 20, 180);
+        this.ctx.fillText(`Lives: ${'❤️'.repeat(this.lives)}`, 20, 270);
 
         // Pause Button (Visible in Playing/Paused)
         if (this.gameState === this.states.PLAYING || this.gameState === this.states.PAUSED) {
@@ -1156,6 +1207,7 @@ class Game {
         this.warpLevel++;
         this.warpLevelKillCount = 0;
         this.enemiesSpawnedInLevel = 0;
+        this.warpTimer = 0;
         this.warpMessageTimer = 3000;
         this.player.resetSpawnAnimation(); // Trigger player transition animation
         this.sound.playExtraLife(); // Reuse for level up sound or create new

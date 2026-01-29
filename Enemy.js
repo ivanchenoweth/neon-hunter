@@ -4,7 +4,8 @@ class Enemy {
         this.size = 25;
         // Increase speed by 20% for each warp level (Warp 1 = 1x, Warp 2 = 1.2x)
         const speedMultiplier = 1 + (this.game.warpLevel - 1) * 0.2;
-        this.speed = (90 + Math.random() * 35) * speedMultiplier;
+        this.baseSpeed = (90 + Math.random() * 35) * speedMultiplier;
+        this.speed = this.baseSpeed;
         this.color = '#ff4444';
         this.markedForDeletion = false;
 
@@ -134,7 +135,8 @@ class Enemy {
         this.y = Math.max(-halfH, Math.min(halfH, this.y));
         this.angle = 0;
         const speedMultiplier = 1 + (this.game.warpLevel - 1) * 0.2;
-        this.speed = (90 + Math.random() * 35) * speedMultiplier;
+        this.baseSpeed = (90 + Math.random() * 35) * speedMultiplier;
+        this.speed = this.baseSpeed;
         this._adjustSpawnIntoView();
     }
 
