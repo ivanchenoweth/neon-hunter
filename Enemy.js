@@ -2,7 +2,9 @@ class Enemy {
     constructor(game) {
         this.game = game;
         this.size = 25;
-        this.speed = 90 + Math.random() * 35;
+        // Increase speed by 20% for each warp level (Warp 1 = 1x, Warp 2 = 1.2x)
+        const speedMultiplier = 1 + (this.game.warpLevel - 1) * 0.2;
+        this.speed = (90 + Math.random() * 35) * speedMultiplier;
         this.color = '#ff4444';
         this.markedForDeletion = false;
 
@@ -85,6 +87,12 @@ class Enemy {
             // Esta parte afecta al estado global del juego
             this.game.takeDamage();
 
+            // Count collision as a kill for progress (User Request)
+            this.game.warpLevelKillCount++;
+            if (this.game.warpLevelKillCount >= this.game.killQuota && this.game.warpMessageTimer <= 0) {
+                this.game.nextLevel();
+            }
+
             // Explosion particles (Client-side)
             for (let i = 0; i < 10; i++) {
                 this.game.particles.push(new Particle(this.game, this.x, this.y, this.color));
@@ -125,7 +133,8 @@ class Enemy {
         this.x = Math.max(-halfW, Math.min(halfW, this.x));
         this.y = Math.max(-halfH, Math.min(halfH, this.y));
         this.angle = 0;
-        this.speed = 90 + Math.random() * 35;
+        const speedMultiplier = 1 + (this.game.warpLevel - 1) * 0.2;
+        this.speed = (90 + Math.random() * 35) * speedMultiplier;
         this._adjustSpawnIntoView();
     }
 

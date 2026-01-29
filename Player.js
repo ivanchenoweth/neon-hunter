@@ -10,6 +10,10 @@ class Player {
         this.trailTimer = 0;
         this.fireDirection = { x: 0, y: -1 }; // Direction pointer for firing
         this.arrowBlinkTimer = 0; // Timer for arrow blink effect when firing
+
+        // Spawn Animation
+        this.spawnDuration = 2000; // 2 seconds
+        this.spawnTimer = this.spawnDuration;
     }
 
     /**
@@ -57,6 +61,10 @@ class Player {
      * Efectos que no afectan el resultado del juego (partículas, trails).
      */
     updateVisuals(deltaTime, movementInfo) {
+        if (this.spawnTimer > 0) {
+            this.spawnTimer -= deltaTime;
+        }
+
         if (!movementInfo) return;
         const { dx, dy } = movementInfo;
 
@@ -78,6 +86,25 @@ class Player {
 
     draw(ctx) {
         ctx.save();
+
+        // Spawn Animation
+        if (this.spawnTimer > 0) {
+            const t = this.spawnTimer / this.spawnDuration; // 1.0 -> 0.0
+            const scale = 1 + t * 9; // 1x -> 10x (interpolating backwards from 10 to 1) 
+            // Wait, t goes from 1 to 0. So 1 + 1*9 = 10. 1 + 0*9 = 1. Correct.
+
+            const alpha = 1 - t; // 0 -> 1
+            const blur = t * 20; // 20px -> 0px
+
+            ctx.filter = `blur(${blur}px)`;
+            ctx.globalAlpha = alpha;
+
+            // Translate to center for scaling
+            ctx.translate(this.x, this.y);
+            ctx.scale(scale, scale);
+            ctx.translate(-this.x, -this.y);
+        }
+
         ctx.beginPath();
         ctx.fillStyle = this.color;
         ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
@@ -163,5 +190,9 @@ class Player {
     triggerArrowBlink() {
         // Trigger the arrow blink effect when firing
         this.arrowBlinkTimer = 150;
+    }
+
+    resetSpawnAnimation() {
+        this.spawnTimer = this.spawnDuration;
     }
 }

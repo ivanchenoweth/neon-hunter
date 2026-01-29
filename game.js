@@ -118,6 +118,15 @@ class Game {
         this.menuCooldown = 0;
         this.sessionActive = false;
 
+        // Warp System
+        // Warp System
+        this.warpLevel = 1;
+        this.warpLevelKillCount = 0;
+        this.killQuota = 100;
+        this.enemiesSpawnedInLevel = 0;
+        this.warpMessageTimer = 0; // Don't show on load
+        this.warpMessageDuration = 3000;
+
         this.lastTime = 0;
         this.loop = this.loop.bind(this);
 
@@ -268,6 +277,14 @@ class Game {
         this.foods = [];
         this.particles = [];
         this.enemyTimer = 0;
+
+        // Reset Warp System
+        // Reset Warp System
+        this.warpLevel = 1;
+        this.warpLevelKillCount = 0;
+        this.enemiesSpawnedInLevel = 0;
+        this.warpMessageTimer = 3000; // Show "WARP 1" on start
+        this.player.resetSpawnAnimation();
 
         // Hide overlays if present
         if (this.startScreen && this.startScreen.classList) this.startScreen.classList.add('hidden');
@@ -880,8 +897,12 @@ class Game {
     spawnEntities(deltaTime) {
         this.enemyTimer += deltaTime;
         if (this.enemyTimer > this.enemyInterval && this.enemies.length < 100) {
-            this.enemies.push(this.enemyPool.get(this));
-            this.enemyTimer = 0;
+            // Finite spawns per level
+            if (this.enemiesSpawnedInLevel < this.killQuota) {
+                this.enemies.push(this.enemyPool.get(this));
+                this.enemiesSpawnedInLevel++;
+                this.enemyTimer = 0;
+            }
         }
         if (this.foods.length < 50) {
             this.foods.push(this.foodPool.get(this));
@@ -914,6 +935,10 @@ class Game {
                             bullet.markedForDeletion = true;
                             this.score += 10;
                             this.enemiesDestroyed++;
+                            this.warpLevelKillCount++;
+                            if (this.warpLevelKillCount >= this.killQuota && this.warpMessageTimer <= 0) {
+                                this.nextLevel();
+                            }
                             this.updateScore();
                             this.createExplosion(enemy.x, enemy.y, enemy.color);
                         }
@@ -985,6 +1010,10 @@ class Game {
 
         const movementInfo = this.updateState(deltaTime);
         this.updateVisuals(deltaTime, movementInfo);
+
+        if (this.warpMessageTimer > 0) {
+            this.warpMessageTimer -= deltaTime;
+        }
     }
 
     draw() {
@@ -1116,6 +1145,49 @@ class Game {
         } else if (this.gameState === this.states.GAME_OVER) {
             this.drawGameOverScreen(this.ctx);
         }
+
+        // Draw Warp Level Text
+        if (this.warpMessageTimer > 0) {
+            this.drawWarpText(this.ctx);
+        }
+    }
+
+    nextLevel() {
+        this.warpLevel++;
+        this.warpLevelKillCount = 0;
+        this.enemiesSpawnedInLevel = 0;
+        this.warpMessageTimer = 3000;
+        this.player.resetSpawnAnimation(); // Trigger player transition animation
+        this.sound.playExtraLife(); // Reuse for level up sound or create new
+
+        // Increase difficulty for new spawns
+        // This is handled in spawnEntities or Enemy constructor reading game.warpLevel
+    }
+
+    drawWarpText(ctx) {
+        ctx.save();
+        const t = this.warpMessageTimer;
+        const d = this.warpMessageDuration;
+        let alpha = 1.0;
+
+        // Fade in (first 0.5s) and Fade out (last 0.5s)
+        if (t > d - 500) {
+            alpha = (d - t) / 500;
+        } else if (t < 500) {
+            alpha = t / 500;
+        }
+
+        ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+        ctx.fillStyle = '#ff00ff';
+        ctx.font = 'bold 100px "Outfit", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowColor = '#ff00ff';
+        ctx.shadowBlur = 40;
+
+        ctx.fillText(`WARP ${this.warpLevel}`, this.width / 2, this.height / 3);
+
+        ctx.restore();
     }
 
     loop(timestamp) {
