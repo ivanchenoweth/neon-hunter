@@ -138,8 +138,8 @@ class Enemy {
         const viewH = cam.height / cam.zoom;
 
         // Reduced margins to bring spawning closer to the visible area
-        const marginW = 150;
-        const marginH = 150;
+        const marginW = 400;
+        const marginH = 400;
 
         const side = Math.floor(Math.random() * 4); // 0: Top, 1: Bottom, 2: Left, 3: Right
 

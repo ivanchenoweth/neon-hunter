@@ -42,6 +42,7 @@ class Game {
         this.score = 0;
         this.coins = 0;
         this.foodCollectedCount = 0;
+        this.enemiesDestroyed = 0;
 
         this.canvas.width = this.width;
         this.canvas.height = this.height;
@@ -208,9 +209,9 @@ class Game {
         });
 
         // Draw spawn area on minimap (where enemies appear)
-        // Consistent with Enemy.js: marginW=150, marginH=150
-        const marginW = 150;
-        const marginH = 150;
+        // Consistent with Enemy.js: marginW=400, marginH=400
+        const marginW = 400;
+        const marginH = 400;
         const viewW = this.camera.width / this.camera.zoom;
         const viewH = this.camera.height / this.camera.zoom;
 
@@ -261,6 +262,7 @@ class Game {
         this.lives = 5;
         this.player.speed = this.baseSpeed;  // Reset player speed on game start
         this.foodCollectedCount = 0;
+        this.enemiesDestroyed = 0;
         this.enemies = [];
         this.bullets = [];
         this.foods = [];
@@ -430,7 +432,7 @@ class Game {
         ctx.shadowBlur = 0;
         ctx.font = `bold ${versionSize}px "Outfit", sans-serif`;
         ctx.fillStyle = '#00ff88';
-        ctx.fillText('v1.6.0-silver-tiger (main • 2026-01-26 02:30)', cx, cy - 150 * scale);
+        ctx.fillText('v1.6.1-crimson-hawk (feat/31-respawn-outside-area • 2026-01-28 21:28)', cx, cy - 150 * scale);
 
         // Zoom Out Button
         const bZoomOut = this.btnBounds.zoomOut;
@@ -853,14 +855,25 @@ class Game {
         const viewW = this.width / this.camera.zoom;
         const viewH = this.height / this.camera.zoom;
 
-        // Reset margin MUST be larger than spawn margin (800 in Enemy.js)
-        const resetMargin = 1500;
+        // Reset margin MUST be consistent with spawn margin (400 in Enemy.js)
+        const resetMargin = 400;
 
         return (
             entity.x < this.camera.x - resetMargin ||
             entity.x > this.camera.x + viewW + resetMargin ||
             entity.y < this.camera.y - resetMargin ||
             entity.y > this.camera.y + viewH + resetMargin
+        );
+    }
+
+    isVisible(entity) {
+        const viewW = this.width / this.camera.zoom;
+        const viewH = this.height / this.camera.zoom;
+        return (
+            entity.x >= this.camera.x &&
+            entity.x <= this.camera.x + viewW &&
+            entity.y >= this.camera.y &&
+            entity.y <= this.camera.y + viewH
         );
     }
 
@@ -891,15 +904,19 @@ class Game {
             const potentialEnemies = this.grid.retrieve(bullet, 50);
             potentialEnemies.forEach(enemy => {
                 if (enemy instanceof Enemy && !enemy.markedForDeletion && !bullet.markedForDeletion) {
-                    const dx = bullet.x - enemy.x;
-                    const dy = bullet.y - enemy.y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    if (dist < enemy.size) {
-                        enemy.markedForDeletion = true;
-                        bullet.markedForDeletion = true;
-                        this.score += 10;
-                        this.updateScore();
-                        this.createExplosion(enemy.x, enemy.y, enemy.color);
+                    // Only damage if enemy is within camera view
+                    if (this.isVisible(enemy)) {
+                        const dx = bullet.x - enemy.x;
+                        const dy = bullet.y - enemy.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        if (dist < enemy.size) {
+                            enemy.markedForDeletion = true;
+                            bullet.markedForDeletion = true;
+                            this.score += 10;
+                            this.enemiesDestroyed++;
+                            this.updateScore();
+                            this.createExplosion(enemy.x, enemy.y, enemy.color);
+                        }
                     }
                 }
             });
@@ -1018,10 +1035,11 @@ class Game {
                 ent.draw(bCtx); // Draw to bloom
                 ent.draw(bCtx); // Extra pass for stronger Food glow
             } else if (ent instanceof Enemy) {
-                if (ent.draw(ctx)) {
+                ent.draw(ctx);
+                if (this.isVisible(ent)) {
                     visibleEnemies++;
-                    ent.draw(bCtx); // Draw to bloom
                 }
+                ent.draw(bCtx); // Draw to bloom
             } else if (ent instanceof Bullet) {
                 ent.draw(ctx);
                 ent.draw(bCtx); // Draw to bloom
@@ -1066,15 +1084,16 @@ class Game {
         this.ctx.fillStyle = '#00ff88';
         this.ctx.font = 'bold 20px "Outfit", sans-serif';
         this.ctx.fillText(`FPS: ${this.fps}`, 20, 30);
-        this.ctx.fillText(`Enemies: ${this.enemies.length} / Visible: ${visibleEnemies}`, 20, 60);
+        this.ctx.fillText(`Enemies Destroyed: ${this.enemiesDestroyed}`, 20, 60);
+        this.ctx.fillText(`Enemies: ${this.enemies.length} / Visible: ${visibleEnemies}`, 20, 90);
         this.ctx.fillStyle = '#ffff00';
-        this.ctx.fillText(`Coins: ${this.coins}`, 20, 90);
+        this.ctx.fillText(`Coins: ${this.coins}`, 20, 120);
         this.ctx.fillStyle = '#00ccff';
-        this.ctx.fillText(`Score: ${this.score}`, 20, 120);
+        this.ctx.fillText(`Score: ${this.score}`, 20, 150);
 
         // Health Indicator
         this.ctx.fillStyle = '#ff4444';
-        this.ctx.fillText(`Lives: ${'❤️'.repeat(this.lives)}`, 20, 150);
+        this.ctx.fillText(`Lives: ${'❤️'.repeat(this.lives)}`, 20, 180);
 
         // Pause Button (Visible in Playing/Paused)
         if (this.gameState === this.states.PLAYING || this.gameState === this.states.PAUSED) {
