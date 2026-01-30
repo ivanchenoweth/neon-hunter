@@ -15,10 +15,14 @@ class Player {
         this.spawnDuration = 2000; // 2 seconds
         this.spawnTimer = this.spawnDuration;
 
-        // Collision Effect
-        this.collisionEffectTimer = 0; // Total duration: 4 seconds (1s reduction + 3s recovery)
-        this.normalSpeed = 110; // Store normal speed
         this.collisionAlpha = 1.0; // Alpha during collision effect
+
+        // Energy Rod / Laser Charge System
+        this.isChargingBeam = false;
+        this.beamChargeTime = 0;
+        this.maxBeamChargeTime = 3000; // 3 seconds to max charge
+        this.beamLength = 0;
+        this.maxBeamLength = 600; // Maximum distance of the laser
     }
 
     /**
@@ -226,6 +230,32 @@ class Player {
         ctx.lineTo(tipX, tipY);
         ctx.closePath();
         ctx.fill();
+
+        // Draw Energy Rod if charging
+        if (this.isChargingBeam && this.beamLength > 0) {
+            ctx.save();
+            ctx.strokeStyle = '#ff00ff';
+            const widthScale = (this.beamChargeTime / this.maxBeamChargeTime);
+            ctx.lineWidth = 4 + widthScale * 12;
+            ctx.lineCap = 'round';
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#ff44ff';
+
+            ctx.beginPath();
+            ctx.moveTo(this.x, this.y);
+            ctx.lineTo(this.x + this.fireDirection.x * this.beamLength, this.y + this.fireDirection.y * this.beamLength);
+            ctx.stroke();
+
+            // Core white line
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2 + widthScale * 4;
+            ctx.beginPath();
+            ctx.moveTo(this.x, this.y);
+            ctx.lineTo(this.x + this.fireDirection.x * this.beamLength, this.y + this.fireDirection.y * this.beamLength);
+            ctx.stroke();
+
+            ctx.restore();
+        }
 
         ctx.restore();
     }

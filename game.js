@@ -58,6 +58,7 @@ class Game {
         this.enemies = [];
         this.bullets = [];
         this.showDebugHUD = false; // Toggle with game.toggleDebug()
+        this.beamSoundTimer = 0;
         // Object Pools
         this.bulletPool = new ObjectPool(() => new Bullet(this, 0, 0, 0, 0), 20);
         this.enemyPool = new ObjectPool(() => new Enemy(this), 20);
@@ -262,6 +263,20 @@ class Game {
             ctx.fillRect(ex - 2, ey - 2, 4, 4);
         });
 
+        // Draw Laser Beam on minimap
+        if (this.player.isChargingBeam && this.player.beamLength > 0) {
+            ctx.strokeStyle = '#ff00ff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            const lx1 = centerX + this.player.x * scale;
+            const ly1 = centerY + this.player.y * scale;
+            const lx2 = centerX + (this.player.x + this.player.fireDirection.x * this.player.beamLength) * scale;
+            const ly2 = centerY + (this.player.y + this.player.fireDirection.y * this.player.beamLength) * scale;
+            ctx.moveTo(lx1, ly1);
+            ctx.lineTo(lx2, ly2);
+            ctx.stroke();
+        }
+
         ctx.restore();
     }
 
@@ -296,7 +311,7 @@ class Game {
         if (this.gameOverScreen && this.gameOverScreen.classList) this.gameOverScreen.classList.add('hidden');
 
         // Anti-bounce: consume input
-        this.input.keys.space = false;
+        this.input.keys.enter = false;
     }
 
     takeDamage() {
@@ -630,6 +645,9 @@ class Game {
         // 1. Enviar inputs si fuera multijugador
         this.sendInputToServer();
 
+        // Update aiming direction first (Authoritative)
+        this.updateAiming();
+
         // 2. Actualizar Entidades (Lógica autoritativa)
         const movementInfo = this.player.updateState(deltaTime, this.input);
 
@@ -673,7 +691,143 @@ class Game {
         this.updateGrid();
         this.processCollisions();
 
+        // 6. Energy Rod Logic
+        this.updateEnergyRod(deltaTime);
+
         return movementInfo;
+    }
+
+    updateAiming() {
+        let worldX, worldY;
+        if (window.inputMode === 'keyboardFire') {
+            let dirX = 0, dirY = 0;
+            if (this.input.keys.i) dirY -= 1;
+            if (this.input.keys.k) dirY += 1;
+            if (this.input.keys.j) dirX -= 1;
+            if (this.input.keys.l) dirX += 1;
+
+            if (dirX !== 0 || dirY !== 0) {
+                const magnitude = Math.sqrt(dirX * dirX + dirY * dirY);
+                worldX = this.player.x + (dirX / magnitude) * 300;
+                worldY = this.player.y + (dirY / magnitude) * 300;
+            } else {
+                worldX = this.player.x + this.player.fireDirection.x * 300;
+                worldY = this.player.y + this.player.fireDirection.y * 300;
+            }
+        } else {
+            worldX = (this.input.mouse.x / this.camera.zoom) + this.camera.x;
+            worldY = (this.input.mouse.y / this.camera.zoom) + this.camera.y;
+        }
+        this.player.setFireDirection(worldX, worldY);
+    }
+
+    updateEnergyRod(deltaTime) {
+        if (this.gameState !== this.states.PLAYING) return;
+
+        const isSpacePressed = this.input.keys.space;
+
+        if (isSpacePressed) {
+            if (!this.player.isChargingBeam) {
+                this.player.isChargingBeam = true;
+                this.player.beamChargeTime = 0;
+            }
+            this.player.beamChargeTime += deltaTime;
+            if (this.player.beamChargeTime > this.player.maxBeamChargeTime) {
+                this.player.beamChargeTime = this.player.maxBeamChargeTime;
+            }
+
+            this.player.beamLength = (this.player.beamChargeTime / this.player.maxBeamChargeTime) * this.player.maxBeamLength;
+
+            // Play throttled charge sound
+            this.beamSoundTimer += deltaTime;
+            if (this.beamSoundTimer > 100) {
+                this.sound.playBeamCharge(this.player.beamChargeTime / this.player.maxBeamChargeTime);
+                this.beamSoundTimer = 0;
+            }
+
+            // Check for collision at current tip in world space
+            const tipX = this.player.x + this.player.fireDirection.x * this.player.beamLength;
+            const tipY = this.player.y + this.player.fireDirection.y * this.player.beamLength;
+
+            // Collision check against enemies
+            let hitEnemy = null;
+            for (const enemy of this.enemies) {
+                const dx = tipX - enemy.x;
+                const dy = tipY - enemy.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < enemy.size / 2 + 10) {
+                    hitEnemy = enemy;
+                    break;
+                }
+            }
+
+            if (hitEnemy) {
+                this.triggerBeamExplosion(tipX, tipY, this.player.beamLength);
+                this.player.isChargingBeam = false;
+                this.player.beamChargeTime = 0;
+                this.player.beamLength = 0;
+            }
+        } else if (this.player.isChargingBeam) {
+            // Released!
+            const tipX = this.player.x + this.player.fireDirection.x * this.player.beamLength;
+            const tipY = this.player.y + this.player.fireDirection.y * this.player.beamLength;
+            this.triggerBeamExplosion(tipX, tipY, this.player.beamLength);
+
+            this.player.isChargingBeam = false;
+            this.player.beamChargeTime = 0;
+            this.player.beamLength = 0;
+        }
+    }
+
+    triggerBeamExplosion(x, y, length) {
+        // Base radius 60, up to 240 at max length
+        const radius = 60 + (length / this.player.maxBeamLength) * 180;
+
+        // Visual effect
+        this.createExplosion(x, y, '#ff00ff', 60);
+        this.sound.playBeamExplosion();
+        // Removed camera shake as per user request
+
+        // Destroy enemies in radius using Spatial Grid for performance
+        const searchBounds = {
+            x: x - radius - 50,
+            y: y - radius - 50,
+            width: radius * 2 + 100,
+            height: radius * 2 + 100
+        };
+
+        const potentialEnemies = this.grid.retrieveByBounds(searchBounds);
+
+        potentialEnemies.forEach(enemy => {
+            if (enemy instanceof Enemy && !enemy.markedForDeletion) {
+                const dx = x - enemy.x;
+                const dy = y - enemy.y;
+                const distSq = dx * dx + dy * dy;
+                const checkDist = radius + enemy.size / 2;
+
+                if (distSq < checkDist * checkDist) {
+                    enemy.markedForDeletion = true;
+                    this.score += 25;
+                    this.enemiesDestroyed++; // Missing previously
+                    this.warpLevelKillCount++; // Missing previously, caused the stuck progress
+                    this.updateScore();
+                    this.createExplosion(enemy.x, enemy.y, enemy.color, 15);
+
+                    // Check for level up immediately
+                    if (this.warpLevelKillCount >= this.killQuota && this.warpMessageTimer <= 0) {
+                        this.nextLevel();
+                    }
+                }
+            }
+        });
+
+        // Add a temporary ripple particle for the explosion range
+        for (let i = 0; i < 360; i += 20) {
+            const rad = i * Math.PI / 180;
+            const px = x + Math.cos(rad) * radius;
+            const py = y + Math.sin(rad) * radius;
+            this.particles.push(new Particle(this, px, py, '#ff00ff'));
+        }
     }
 
     /**
@@ -690,42 +844,11 @@ class Game {
 
         this.particles.forEach(p => p.update());
 
-        // Update player fire direction based on input mode
-        let worldMouseX, worldMouseY;
-        let screenMouseX = this.input.mouse.x;
-        let screenMouseY = this.input.mouse.y;
-
-        if (window.inputMode === 'keyboardFire') {
-            // For WASD+IJLK mode, use IJLK keys to determine direction
-            let dirX = 0, dirY = 0;
-            if (this.input.keys.i) dirY -= 1;
-            if (this.input.keys.k) dirY += 1;
-            if (this.input.keys.j) dirX -= 1;
-            if (this.input.keys.l) dirX += 1;
-
-            if (dirX !== 0 || dirY !== 0) {
-                // Normalize diagonal movement
-                const magnitude = Math.sqrt(dirX * dirX + dirY * dirY);
-                dirX /= magnitude;
-                dirY /= magnitude;
-                // Set fire direction based on key input
-                worldMouseX = this.player.x + dirX * 300;
-                worldMouseY = this.player.y + dirY * 300;
-            } else {
-                // If no key pressed, keep current fire direction
-                worldMouseX = this.player.x + this.player.fireDirection.x * 300;
-                worldMouseY = this.player.y + this.player.fireDirection.y * 300;
-            }
-            // Convert world coordinates back to screen coordinates for shooting
-            screenMouseX = (worldMouseX - this.camera.x) * this.camera.zoom;
-            screenMouseY = (worldMouseY - this.camera.y) * this.camera.zoom;
-        } else {
-            // For other modes, use mouse position
-            worldMouseX = (this.input.mouse.x / this.camera.zoom) + this.camera.x;
-            worldMouseY = (this.input.mouse.y / this.camera.zoom) + this.camera.y;
-        }
-
-        this.player.setFireDirection(worldMouseX, worldMouseY);
+        // Shooting targets (Screen space for regular bullets)
+        const worldMouseX = this.player.x + this.player.fireDirection.x * 300;
+        const worldMouseY = this.player.y + this.player.fireDirection.y * 300;
+        const screenMouseX = (worldMouseX - this.camera.x) * this.camera.zoom;
+        const screenMouseY = (worldMouseY - this.camera.y) * this.camera.zoom;
 
         // Cleanup de partículas (siempre local)
         for (let i = this.particles.length - 1; i >= 0; i--) {
@@ -765,7 +888,7 @@ class Game {
         const down = this.input.keys.s || this.input.keys.arrowdown || (this.input.joystickLeft && this.input.joystickLeft.y > 0.5);
         const left = this.input.keys.a || this.input.keys.arrowleft || (this.input.joystickLeft && this.input.joystickLeft.x < -0.5);
         const right = this.input.keys.d || this.input.keys.arrowright || (this.input.joystickLeft && this.input.joystickLeft.x > 0.5);
-        const select = this.input.keys.space;
+        const select = this.input.keys.enter;
 
         // Skip joystick/keyboard navigation if input mode is 'touch'
         // as buttons can be clicked/touched directly.
@@ -837,7 +960,7 @@ class Game {
                             this.startGame();
                         }
                         // Anti-bounce: consume input
-                        this.input.keys.space = false;
+                        this.input.keys.enter = false;
                     }
                 }
             }
@@ -922,9 +1045,15 @@ class Game {
 
     spawnEntities(deltaTime) {
         this.enemyTimer += deltaTime;
-        if (this.enemyTimer > this.enemyInterval && this.enemies.length < 100) {
-            // Finite spawns per level
-            if (this.enemiesSpawnedInLevel < this.killQuota) {
+
+        // Keep spawning until the Warp Quota is met.
+        // We want to maintain a healthy population of enemies (max 60) as long as we haven't reached the goal.
+        const spawnInterval = this.enemies.length === 0 ? this.enemyInterval / 2 : this.enemyInterval;
+
+        if (this.enemyTimer > spawnInterval && this.enemies.length < 60) {
+            if (this.warpLevelKillCount < this.killQuota) {
+                // We keep spawning regardless of enemiesSpawnedInLevel, 
+                // because some enemies might have been "lost" or killed without counting.
                 this.enemies.push(this.enemyPool.get(this));
                 this.enemiesSpawnedInLevel++;
                 this.enemyTimer = 0;
@@ -1021,12 +1150,12 @@ class Game {
             this.input.keys.p = false; // Consume the key press
         }
 
-        // Spacebar to Main Menu (Pause & Exit) from Playing/Paused
-        if ((this.gameState === this.states.PLAYING || this.gameState === this.states.PAUSED) && this.input.keys.space) {
+        // Enter to Main Menu (Pause & Exit) from Playing/Paused
+        if ((this.gameState === this.states.PLAYING || this.gameState === this.states.PAUSED) && this.input.keys.enter) {
             this.gameState = this.states.INITIAL;
             this.menuCooldown = 500; // Prevent immediate selection
             this.sound.playCollect();
-            this.input.keys.space = false; // Consume input
+            this.input.keys.enter = false; // Consume input
             return; // Skip rest of update
         }
 

@@ -11,6 +11,7 @@ class InputHandler {
             k: false,
             p: false,
             space: false,
+            enter: false,
             arrowleft: false,
             arrowdown: false,
             arrowup: false,
@@ -76,6 +77,9 @@ class InputHandler {
         if (e.code === 'Space') {
             this.keys.space = true;
         }
+        if (e.code === 'Enter') {
+            this.keys.enter = true;
+        }
     }
 
     handleKeyUp(e) {
@@ -85,6 +89,9 @@ class InputHandler {
         }
         if (e.code === 'Space') {
             this.keys.space = false;
+        }
+        if (e.code === 'Enter') {
+            this.keys.enter = false;
         }
     }
 
