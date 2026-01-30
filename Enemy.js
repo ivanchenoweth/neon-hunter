@@ -81,13 +81,18 @@ class Enemy {
         });
 
         // Collision with player
-        // NOTA: En un servidor autoritativo, esto se calcularía en el server 
-        // y se notificaría al cliente para que reste puntos y cree efectos.
-        if (dist < this.game.player.radius + this.size / 2) {
+        // Skip collision entirely if player is invulnerable (blinking)
+        const isInvincible = this.game.player.collisionEffectTimer > 0;
+        if (!isInvincible && dist < this.game.player.radius + this.size / 2) {
             this.markedForDeletion = true;
+
+            // Trigger collision effect (speed reduction + alpha reduction)
+            this.game.player.triggerCollisionEffect();
 
             // Esta parte afecta al estado global del juego
             this.game.takeDamage();
+
+            // Grant points and kill count
             this.game.score += 10;
             this.game.enemiesDestroyed++;
             this.game.updateScore();

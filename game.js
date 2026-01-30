@@ -270,7 +270,8 @@ class Game {
         this.score = 0;
         this.coins = 0;
         this.lives = 5;
-        this.baseSpeed = 110;  // Reset base speed to 110
+        // Warp speed system: warp 1=110, warp 2=120, ..., warp 7=170 (max)
+        this.baseSpeed = 110;  // Starting speed for warp 1
         this.player.speed = this.baseSpeed;  // Reset player speed on game start
         this.foodCollectedCount = 0;
         this.enemiesDestroyed = 0;
@@ -303,11 +304,6 @@ class Game {
         this.lives--;
         this.sound.playDamage();
         this.camera.shake(20, 300);
-
-        // Reduce player speed based on remaining lives (more lives = faster)
-        // Speed ranges from 50% to 100% of base speed
-        const speedMultiplier = Math.min(1.0, 0.5 + (this.lives / this.maxLives) * 0.5);
-        this.player.speed = Math.min(150, this.baseSpeed * speedMultiplier);
 
         if (this.lives <= 0) {
             this.gameOver();
@@ -992,8 +988,8 @@ class Game {
                     const progress = (this.foodCollectedCount - 1) % 5;
                     this.sound.playCollect(progress);
 
-                    // Extra life every 5 collected foods (up to maxLives)
-                    if (this.foodCollectedCount % 5 === 0 && this.lives < this.maxLives) {
+                    // Extra life every 5 collected foods (no limit)
+                    if (this.foodCollectedCount % 5 === 0) {
                         this.lives++;
                         this.sound.playExtraLife();
                         // Special particles for life gain
@@ -1214,10 +1210,14 @@ class Game {
         this.player.resetSpawnAnimation(); // Trigger player transition animation
         this.sound.playExtraLife(); // Reuse for level up sound or create new
 
-        // Increase player base speed, max 150
-        this.baseSpeed = Math.min(150, this.baseSpeed + 10);
-        const speedMultiplier = Math.min(1.0, 0.5 + (this.lives / this.maxLives) * 0.5);
-        this.player.speed = Math.min(150, this.baseSpeed * speedMultiplier);
+        // Progressive speed by warp: warp 1=110, warp 2=120, ..., warp 7=170 (max)
+        // Formula: 100 + (warpLevel * 10), capped at 170
+        this.baseSpeed = Math.min(170, 100 + (this.warpLevel * 10));
+
+        // Reset player speed to the new base speed (unless in collision effect)
+        if (this.player.collisionEffectTimer <= 0) {
+            this.player.speed = this.baseSpeed;
+        }
     }
 
     drawWarpText(ctx) {

@@ -14,6 +14,11 @@ class Player {
         // Spawn Animation
         this.spawnDuration = 2000; // 2 seconds
         this.spawnTimer = this.spawnDuration;
+
+        // Collision Effect
+        this.collisionEffectTimer = 0; // Total duration: 4 seconds (1s reduction + 3s recovery)
+        this.normalSpeed = 110; // Store normal speed
+        this.collisionAlpha = 1.0; // Alpha during collision effect
     }
 
     /**
@@ -22,6 +27,39 @@ class Player {
      * En un entorno multijugador, esto correría en el servidor.
      */
     updateState(deltaTime, input) {
+        // Update collision effect timer
+        if (this.collisionEffectTimer > 0) {
+            this.collisionEffectTimer -= deltaTime;
+
+            const totalDuration = 4000; // 4 seconds total
+            const reductionDuration = 1000; // 1 second of slow speed (impact phase)
+            const recoveryDuration = 3000; // 3 seconds of recovery phase
+
+            // Always use the game's base speed to avoid compounding reductions
+            const baseSpeed = this.game.baseSpeed || 110;
+
+            if (this.collisionEffectTimer > recoveryDuration) {
+                // Impact Phase (First 1 second): Stay at 70% speed and 50% alpha (30% reduction)
+                this.speed = baseSpeed * 0.7;
+                this.collisionAlpha = 0.5;
+            } else {
+                // Recovery Phase (Remaining 3 seconds): Recover from 70% to 100%
+                const recoveryProgress = (recoveryDuration - this.collisionEffectTimer) / recoveryDuration;
+                this.speed = baseSpeed * (0.7 + 0.3 * recoveryProgress);
+                this.collisionAlpha = 0.5 + 0.5 * recoveryProgress;
+            }
+
+            if (this.collisionEffectTimer <= 0) {
+                // Effect finished, restore to normal
+                this.speed = this.game.baseSpeed || 110;
+                this.collisionAlpha = 1.0;
+            }
+        } else {
+            // No collision effect active, maintain base speed
+            this.speed = this.game.baseSpeed || 110;
+            this.collisionAlpha = 1.0;
+        }
+
         let dx = 0;
         let dy = 0;
 
@@ -103,6 +141,23 @@ class Player {
             ctx.translate(this.x, this.y);
             ctx.scale(scale, scale);
             ctx.translate(-this.x, -this.y);
+        } else {
+            // Apply collision alpha and dynamic blink effect
+            ctx.globalAlpha = this.collisionAlpha;
+
+            if (this.collisionEffectTimer > 0) {
+                // Time passed since the collision (0 to 4000ms)
+                const timePassed = 4000 - this.collisionEffectTimer;
+
+                // Accelerated frequency:
+                // Starts fast (~12Hz) and ends "super fast" (~30Hz)
+                // This creates a frantic and high-energy recovery sensation
+                const phase = timePassed * (0.012 + 0.0000025 * timePassed);
+
+                if (Math.floor(phase) % 2 === 0) {
+                    ctx.globalAlpha = 0; // Hide ship during blink phase
+                }
+            }
         }
 
         ctx.beginPath();
@@ -190,6 +245,12 @@ class Player {
     triggerArrowBlink() {
         // Trigger the arrow blink effect when firing
         this.arrowBlinkTimer = 150;
+    }
+
+    triggerCollisionEffect() {
+        // Trigger the collision effect (speed reduction + alpha reduction)
+        this.collisionEffectTimer = 4000; // 4 seconds total (1s reduction + 3s recovery)
+        this.normalSpeed = this.game.baseSpeed || 110; // Store current normal speed
     }
 
     resetSpawnAnimation() {
