@@ -20,6 +20,8 @@ class InputHandler {
 
         this.mouse = { x: 0, y: 0 };
         this.mouseDown = false;
+        this.rightMouseDown = false;
+        this.virtualBeamButton = false; // For touch mode extra button
 
         // Binding methods
         this._onKeyDown = this.handleKeyDown.bind(this);
@@ -28,8 +30,15 @@ class InputHandler {
             this.mouse.x = e.clientX;
             this.mouse.y = e.clientY;
         };
-        this._onMouseDown = () => this.mouseDown = true;
-        this._onMouseUp = () => this.mouseDown = false;
+        this._onMouseDown = (e) => {
+            if (e.button === 0) this.mouseDown = true;
+            if (e.button === 2) this.rightMouseDown = true;
+        };
+        this._onMouseUp = (e) => {
+            if (e.button === 0) this.mouseDown = false;
+            if (e.button === 2) this.rightMouseDown = false;
+        };
+        this._onContextMenu = (e) => e.preventDefault();
 
         // Virtual joysticks (multitouch)
         this.joystickLeft = { x: 0, y: 0, active: false };
@@ -54,6 +63,7 @@ class InputHandler {
         window.removeEventListener('mousemove', this._onMouseMove);
         window.removeEventListener('mousedown', this._onMouseDown);
         window.removeEventListener('mouseup', this._onMouseUp);
+        window.removeEventListener('contextmenu', this._onContextMenu);
 
         const mode = window.inputMode || 'keyboard';
 
@@ -65,6 +75,7 @@ class InputHandler {
                 window.addEventListener('mousemove', this._onMouseMove);
                 window.addEventListener('mousedown', this._onMouseDown);
                 window.addEventListener('mouseup', this._onMouseUp);
+                window.addEventListener('contextmenu', this._onContextMenu);
             }
         }
     }

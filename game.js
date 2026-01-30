@@ -724,9 +724,10 @@ class Game {
     updateEnergyRod(deltaTime) {
         if (this.gameState !== this.states.PLAYING) return;
 
-        const isSpacePressed = this.input.keys.space;
+        // Activation sources: Spacebar, Right Click (Mouse mode), or Virtual Button (Touch)
+        const isBeamRequested = this.input.keys.space || this.input.rightMouseDown || this.input.virtualBeamButton;
 
-        if (isSpacePressed) {
+        if (isBeamRequested) {
             if (!this.player.isChargingBeam) {
                 this.player.isChargingBeam = true;
                 this.player.beamChargeTime = 0;
@@ -871,7 +872,7 @@ class Game {
             shouldShoot = this.input.mouseDown;
         }
 
-        if (shouldShoot && this.shotTimer <= 0) {
+        if (shouldShoot && this.shotTimer <= 0 && !this.player.isChargingBeam) {
             this.shoot(screenMouseX, screenMouseY);
             this.shotTimer = this.shotInterval;
         }

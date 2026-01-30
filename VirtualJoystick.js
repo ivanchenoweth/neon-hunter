@@ -3,8 +3,9 @@ class VirtualJoystickManager {
         this.maxRadius = 60; // pixels
         this.left = this._createJoystick('left');
         this.right = this._createJoystick('right');
+        this.beamBtn = this._createBeamButton();
         this._bindEvents();
-        window.virtualJoysticks = { left: this.left.api, right: this.right.api };
+        window.virtualJoysticks = { left: this.left.api, right: this.right.api, beam: this.beamBtn.api };
         // React to input mode changes (main.js sets window.inputMode)
         this._updatePlaceholders();
         window.addEventListener('inputModeChanged', () => this._updatePlaceholders());
@@ -47,6 +48,68 @@ class VirtualJoystickManager {
         return { side, container, bg, knob, state, api };
     }
 
+    _createBeamButton() {
+        const btn = document.createElement('div');
+        btn.className = 'vj-beam-btn';
+        btn.innerHTML = 'BEAM';
+
+        // Styling
+        Object.assign(btn.style, {
+            position: 'absolute',
+            display: 'none',
+            width: '100px',
+            height: '100px',
+            borderRadius: '50%',
+            background: 'rgba(255, 0, 255, 0.2)',
+            border: '2px solid rgba(255, 0, 255, 0.5)',
+            color: '#fff',
+            fontSize: '18px',
+            fontWeight: 'bold',
+            textAlign: 'center',
+            lineHeight: '100px',
+            pointerEvents: 'auto',
+            userSelect: 'none',
+            zIndex: '1000',
+            boxShadow: '0 0 15px rgba(255, 0, 255, 0.3)',
+            transition: 'transform 0.1s, background 0.1s'
+        });
+
+        document.body.appendChild(btn);
+
+        const state = { active: false, touchId: null };
+        const api = {
+            isActive: () => state.active
+        };
+
+        btn.addEventListener('touchstart', (e) => {
+            if (state.touchId === null) {
+                state.touchId = e.changedTouches[0].identifier;
+                state.active = true;
+                btn.style.background = 'rgba(255, 0, 255, 0.5)';
+                btn.style.transform = 'scale(0.9)';
+                if (window.game && window.game.input) window.game.input.virtualBeamButton = true;
+            }
+            e.preventDefault();
+        }, { passive: false });
+
+        const handleEnd = (e) => {
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === state.touchId) {
+                    state.touchId = null;
+                    state.active = false;
+                    btn.style.background = 'rgba(255, 0, 255, 0.2)';
+                    btn.style.transform = 'scale(1)';
+                    if (window.game && window.game.input) window.game.input.virtualBeamButton = false;
+                }
+            }
+        };
+
+        btn.addEventListener('touchend', handleEnd);
+        btn.addEventListener('touchcancel', handleEnd);
+
+        return { element: btn, state, api };
+    }
+
     _updateSizes() {
         // Compute maxRadius relative to device viewport (about 9% of smaller side)
         const base = Math.min(window.innerWidth, window.innerHeight || 600);
@@ -68,6 +131,13 @@ class VirtualJoystickManager {
             j.knob.style.marginTop = -(knobSize / 2) + 'px';
         });
         // Update placeholders positions after resizing
+        if (this.beamBtn) {
+            const btnSize = Math.round(this.maxRadius * 1.2);
+            this.beamBtn.element.style.width = btnSize + 'px';
+            this.beamBtn.element.style.height = btnSize + 'px';
+            this.beamBtn.element.style.lineHeight = btnSize + 'px';
+            this.beamBtn.element.style.fontSize = Math.round(btnSize * 0.2) + 'px';
+        }
         this._updatePlaceholders();
     }
 
@@ -129,6 +199,18 @@ class VirtualJoystickManager {
             this.right.bg.style.border = '1px dashed rgba(255,255,255,0.06)';
         } else if (!this.right.state.active) {
             this.right.container.style.display = 'none';
+        }
+
+        // Beam button position
+        if (mode === 'touch') {
+            const rightX = Math.max(20, window.innerWidth - (this.maxRadius * 2) - 20);
+            const top = Math.max(20, window.innerHeight - (this.maxRadius * 2) - 20);
+
+            this.beamBtn.element.style.display = 'block';
+            this.beamBtn.element.style.left = (rightX + this.maxRadius - parseInt(this.beamBtn.element.style.width) / 2) + 'px';
+            this.beamBtn.element.style.top = (top - parseInt(this.beamBtn.element.style.height) - 60) + 'px';
+        } else {
+            this.beamBtn.element.style.display = 'none';
         }
     }
 
