@@ -57,6 +57,7 @@ class Game {
         this.foods = [];
         this.enemies = [];
         this.bullets = [];
+        this.showDebugHUD = false; // Toggle with game.toggleDebug()
         // Object Pools
         this.bulletPool = new ObjectPool(() => new Bullet(this, 0, 0, 0, 0), 20);
         this.enemyPool = new ObjectPool(() => new Enemy(this), 20);
@@ -1138,40 +1139,42 @@ class Game {
         // 3. Draw UI and HUD (Static on screen, should NOT glow)
         this.drawMinimap(this.ctx);
 
-        // Draw FPS and Enemy Counters
-        this.ctx.fillStyle = '#00ff88';
+        // Draw Main HUD (Visual)
         this.ctx.font = 'bold 20px "Outfit", sans-serif';
-        this.ctx.fillText(`FPS: ${this.fps}`, 20, 30);
-        this.ctx.fillText(`Enemies Destroyed: ${this.enemiesDestroyed}`, 20, 60);
-        this.ctx.fillText(`Warp ${this.warpLevel} Progress: ${this.warpLevelKillCount} / ${this.killQuota}`, 20, 90);
 
-        // Warp Timer
-        const seconds = Math.floor(this.warpTimer / 1000);
-        const mm = Math.floor(seconds / 60).toString().padStart(2, '0');
-        const ss = (seconds % 60).toString().padStart(2, '0');
-
-        if (this.warpTimer > 30000) this.ctx.fillStyle = '#ff4444'; // Red after 30s
-        else this.ctx.fillStyle = '#00ff88';
-        this.ctx.fillText(`Warp Time: ${mm}:${ss}`, 20, 120);
-
-        this.ctx.fillStyle = '#00ff88';
-        this.ctx.fillText(`Enemies: ${this.enemies.length} / Visible: ${visibleEnemies}`, 20, 150);
-
-        // Speed Labels
-        const maxEnemySpeed = this.enemies.reduce((max, e) => Math.max(max, e.speed), 0);
-        this.ctx.fillStyle = '#00d4ff';
-        this.ctx.fillText(`Ship Speed: ${Math.round(this.player.speed)}`, 20, 180);
-        this.ctx.fillStyle = '#ff4444';
-        this.ctx.fillText(`Max Enemy Speed: ${Math.round(maxEnemySpeed)}`, 20, 210);
+        this.ctx.fillStyle = '#00ccff';
+        this.ctx.fillText(`Score: ${this.score}`, 20, 30);
 
         this.ctx.fillStyle = '#ffff00';
-        this.ctx.fillText(`Coins: ${this.coins}`, 20, 240);
-        this.ctx.fillStyle = '#00ccff';
-        this.ctx.fillText(`Score: ${this.score}`, 20, 270);
+        this.ctx.fillText(`Coins: ${this.coins}`, 20, 60);
 
-        // Health Indicator
         this.ctx.fillStyle = '#ff4444';
-        this.ctx.fillText(`Lives: ${'❤️'.repeat(this.lives)}`, 20, 300);
+        this.ctx.fillText(`Lives: ${'❤️'.repeat(this.lives)}`, 20, 90);
+
+        // Conditional Debug HUD
+        if (this.showDebugHUD) {
+            const maxEnemySpeed = this.enemies.reduce((max, e) => Math.max(max, e.speed), 0);
+            const seconds = Math.floor(this.warpTimer / 1000);
+            const mm = Math.floor(seconds / 60).toString().padStart(2, '0');
+            const ss = (seconds % 60).toString().padStart(2, '0');
+
+            this.ctx.fillStyle = '#00ff88';
+            this.ctx.fillText(`FPS: ${this.fps}`, 20, 150);
+            this.ctx.fillText(`Warp ${this.warpLevel} Progress: ${this.warpLevelKillCount} / ${this.killQuota}`, 20, 180);
+
+            if (this.warpTimer > 30000) this.ctx.fillStyle = '#ff4444';
+            else this.ctx.fillStyle = '#00ff88';
+            this.ctx.fillText(`Warp Time: ${mm}:${ss}`, 20, 210);
+
+            this.ctx.fillStyle = '#00ff88';
+            this.ctx.fillText(`Enemies Total: ${this.enemies.length} / Visible: ${visibleEnemies}`, 20, 240);
+
+            this.ctx.fillStyle = '#00d4ff';
+            this.ctx.fillText(`Ship Speed: ${Math.round(this.player.speed)}`, 20, 270);
+
+            this.ctx.fillStyle = '#ff4444';
+            this.ctx.fillText(`Max Enemy Speed: ${Math.round(maxEnemySpeed)}`, 20, 300);
+        }
 
         // Pause Button (Visible in Playing/Paused)
         if (this.gameState === this.states.PLAYING || this.gameState === this.states.PAUSED) {
@@ -1244,6 +1247,11 @@ class Game {
         ctx.fillText(`WARP ${this.warpLevel}`, this.width / 2, this.height / 3);
 
         ctx.restore();
+    }
+
+    toggleDebug() {
+        this.showDebugHUD = !this.showDebugHUD;
+        console.log(`Debug HUD is now: ${this.showDebugHUD ? 'ENABLED' : 'DISABLED'}`);
     }
 
     loop(timestamp) {
