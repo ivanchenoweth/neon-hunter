@@ -90,7 +90,7 @@ class Game {
         this.gameState = this.states.INITIAL;
         this.lives = 5;
         this.maxLives = 5;  // Track max lives for speed calculation
-        this.baseSpeed = 175;  // Base player speed
+        this.baseSpeed = 110;  // Base player speed
 
         // Pause button bounds (Top Right)
         this.pauseBtnBounds = { x: this.width - 60, y: 20, w: 40, h: 40 };
@@ -270,6 +270,7 @@ class Game {
         this.score = 0;
         this.coins = 0;
         this.lives = 5;
+        this.baseSpeed = 110;  // Reset base speed to 110
         this.player.speed = this.baseSpeed;  // Reset player speed on game start
         this.foodCollectedCount = 0;
         this.enemiesDestroyed = 0;
@@ -305,8 +306,8 @@ class Game {
 
         // Reduce player speed based on remaining lives (more lives = faster)
         // Speed ranges from 50% to 100% of base speed
-        const speedMultiplier = 0.5 + (this.lives / this.maxLives) * 0.5;
-        this.player.speed = this.baseSpeed * speedMultiplier;
+        const speedMultiplier = Math.min(1.0, 0.5 + (this.lives / this.maxLives) * 0.5);
+        this.player.speed = Math.min(150, this.baseSpeed * speedMultiplier);
 
         if (this.lives <= 0) {
             this.gameOver();
@@ -991,8 +992,8 @@ class Game {
                     const progress = (this.foodCollectedCount - 1) % 5;
                     this.sound.playCollect(progress);
 
-                    // Extra life every 5 collected foods
-                    if (this.foodCollectedCount % 5 === 0) {
+                    // Extra life every 5 collected foods (up to maxLives)
+                    if (this.foodCollectedCount % 5 === 0 && this.lives < this.maxLives) {
                         this.lives++;
                         this.sound.playExtraLife();
                         // Special particles for life gain
@@ -1146,6 +1147,7 @@ class Game {
         this.ctx.font = 'bold 20px "Outfit", sans-serif';
         this.ctx.fillText(`FPS: ${this.fps}`, 20, 30);
         this.ctx.fillText(`Enemies Destroyed: ${this.enemiesDestroyed}`, 20, 60);
+        this.ctx.fillText(`Warp ${this.warpLevel} Progress: ${this.warpLevelKillCount} / ${this.killQuota}`, 20, 90);
 
         // Warp Timer
         const seconds = Math.floor(this.warpTimer / 1000);
@@ -1154,26 +1156,26 @@ class Game {
 
         if (this.warpTimer > 30000) this.ctx.fillStyle = '#ff4444'; // Red after 30s
         else this.ctx.fillStyle = '#00ff88';
-        this.ctx.fillText(`Warp Time: ${mm}:${ss}`, 20, 90);
+        this.ctx.fillText(`Warp Time: ${mm}:${ss}`, 20, 120);
 
         this.ctx.fillStyle = '#00ff88';
-        this.ctx.fillText(`Enemies: ${this.enemies.length} / Visible: ${visibleEnemies}`, 20, 120);
+        this.ctx.fillText(`Enemies: ${this.enemies.length} / Visible: ${visibleEnemies}`, 20, 150);
 
         // Speed Labels
         const maxEnemySpeed = this.enemies.reduce((max, e) => Math.max(max, e.speed), 0);
         this.ctx.fillStyle = '#00d4ff';
-        this.ctx.fillText(`Ship Speed: ${Math.round(this.player.speed)}`, 20, 150);
+        this.ctx.fillText(`Ship Speed: ${Math.round(this.player.speed)}`, 20, 180);
         this.ctx.fillStyle = '#ff4444';
-        this.ctx.fillText(`Max Enemy Speed: ${Math.round(maxEnemySpeed)}`, 20, 180);
+        this.ctx.fillText(`Max Enemy Speed: ${Math.round(maxEnemySpeed)}`, 20, 210);
 
         this.ctx.fillStyle = '#ffff00';
-        this.ctx.fillText(`Coins: ${this.coins}`, 20, 210);
+        this.ctx.fillText(`Coins: ${this.coins}`, 20, 240);
         this.ctx.fillStyle = '#00ccff';
-        this.ctx.fillText(`Score: ${this.score}`, 20, 240);
+        this.ctx.fillText(`Score: ${this.score}`, 20, 270);
 
         // Health Indicator
         this.ctx.fillStyle = '#ff4444';
-        this.ctx.fillText(`Lives: ${'❤️'.repeat(this.lives)}`, 20, 270);
+        this.ctx.fillText(`Lives: ${'❤️'.repeat(this.lives)}`, 20, 300);
 
         // Pause Button (Visible in Playing/Paused)
         if (this.gameState === this.states.PLAYING || this.gameState === this.states.PAUSED) {
@@ -1212,8 +1214,10 @@ class Game {
         this.player.resetSpawnAnimation(); // Trigger player transition animation
         this.sound.playExtraLife(); // Reuse for level up sound or create new
 
-        // Increase difficulty for new spawns
-        // This is handled in spawnEntities or Enemy constructor reading game.warpLevel
+        // Increase player base speed, max 150
+        this.baseSpeed = Math.min(150, this.baseSpeed + 10);
+        const speedMultiplier = Math.min(1.0, 0.5 + (this.lives / this.maxLives) * 0.5);
+        this.player.speed = Math.min(150, this.baseSpeed * speedMultiplier);
     }
 
     drawWarpText(ctx) {

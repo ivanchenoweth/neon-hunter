@@ -4,7 +4,7 @@ class Player {
         this.radius = 10;
         this.x = 0;
         this.y = 0;
-        this.speed = 175;
+        this.speed = 110;
         this.color = '#00ff88';
         this.glow = '#00ff88';
         this.trailTimer = 0;

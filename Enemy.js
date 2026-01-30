@@ -4,7 +4,8 @@ class Enemy {
         this.size = 25;
         // Increase speed by 20% for each warp level (Warp 1 = 1x, Warp 2 = 1.2x)
         const speedMultiplier = 1 + (this.game.warpLevel - 1) * 0.2;
-        this.baseSpeed = (90 + Math.random() * 35) * speedMultiplier;
+        const maxSpeed = 90 * speedMultiplier;
+        this.baseSpeed = maxSpeed * (0.8 + Math.random() * 0.2);
         this.speed = this.baseSpeed;
         this.color = '#ff4444';
         this.markedForDeletion = false;
@@ -87,6 +88,9 @@ class Enemy {
 
             // Esta parte afecta al estado global del juego
             this.game.takeDamage();
+            this.game.score += 10;
+            this.game.enemiesDestroyed++;
+            this.game.updateScore();
 
             // Count collision as a kill for progress (User Request)
             this.game.warpLevelKillCount++;
@@ -135,7 +139,8 @@ class Enemy {
         this.y = Math.max(-halfH, Math.min(halfH, this.y));
         this.angle = 0;
         const speedMultiplier = 1 + (this.game.warpLevel - 1) * 0.2;
-        this.baseSpeed = (90 + Math.random() * 35) * speedMultiplier;
+        const maxSpeed = 90 * speedMultiplier;
+        this.baseSpeed = maxSpeed * (0.8 + Math.random() * 0.2);
         this.speed = this.baseSpeed;
         this._adjustSpawnIntoView();
     }
