@@ -63,10 +63,10 @@ class VirtualJoystickManager {
             top: '0',
             right: '0',
             borderRadius: '0 0 0 60px',
-            background: 'rgba(255, 0, 255, 0.03)',
-            borderLeft: '2px dashed rgba(255, 0, 255, 0.1)',
-            borderBottom: '2px dashed rgba(255, 0, 255, 0.1)',
-            color: 'rgba(255, 255, 255, 0.1)',
+            background: 'rgba(255, 0, 255, 0.05)',
+            borderLeft: '2px dashed rgba(255, 0, 255, 0.2)',
+            borderBottom: '2px dashed rgba(255, 0, 255, 0.2)',
+            color: 'rgba(255, 0, 255, 0.3)',
             fontSize: '32px',
             fontWeight: 'bold',
             display: 'none', // Initial
@@ -74,9 +74,9 @@ class VirtualJoystickManager {
             justifyContent: 'center',
             pointerEvents: 'auto',
             userSelect: 'none',
-            zIndex: '1500',
-            boxShadow: 'inset -20px -20px 40px rgba(255, 0, 255, 0.05)',
-            transition: 'background 0.2s, color 0.2s'
+            zIndex: '2500', // Above joysticks (2000)
+            boxShadow: 'inset -20px -20px 60px rgba(255, 0, 255, 0.08)',
+            transition: 'background 0.2s, color 0.2s, border 0.2s'
         });
 
         document.body.appendChild(btn);
@@ -90,11 +90,14 @@ class VirtualJoystickManager {
             if (state.touchId === null) {
                 state.touchId = e.changedTouches[0].identifier;
                 state.active = true;
-                btn.style.background = 'rgba(255, 0, 255, 0.15)';
-                btn.style.color = 'rgba(255, 255, 255, 0.6)';
+                btn.style.background = 'rgba(255, 0, 255, 0.25)';
+                btn.style.color = 'rgba(255, 255, 255, 0.8)';
+                btn.style.borderLeft = '2px solid rgba(255, 0, 255, 0.6)';
+                btn.style.borderBottom = '2px solid rgba(255, 0, 255, 0.6)';
                 if (window.game && window.game.input) window.game.input.virtualBeamButton = true;
             }
             e.preventDefault();
+            e.stopPropagation(); // Prevent spawning a joystick here
         }, { passive: false });
 
         const handleEnd = (e) => {
@@ -102,10 +105,13 @@ class VirtualJoystickManager {
                 if (e.changedTouches[i].identifier === state.touchId) {
                     state.touchId = null;
                     state.active = false;
-                    btn.style.background = 'rgba(255, 0, 255, 0.03)';
-                    btn.style.color = 'rgba(255, 255, 255, 0.1)';
+                    btn.style.background = 'rgba(255, 0, 255, 0.05)';
+                    btn.style.color = 'rgba(255, 0, 255, 0.3)';
+                    btn.style.borderLeft = '2px dashed rgba(255, 0, 255, 0.2)';
+                    btn.style.borderBottom = '2px dashed rgba(255, 0, 255, 0.2)';
                     if (window.game && window.game.input) window.game.input.virtualBeamButton = false;
                 }
+                e.stopPropagation();
             }
         };
 
