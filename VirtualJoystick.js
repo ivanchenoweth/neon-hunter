@@ -53,25 +53,30 @@ class VirtualJoystickManager {
         btn.className = 'vj-beam-btn';
         btn.innerHTML = 'BEAM';
 
-        // Styling
+        // Styling for a large area covering top-right quadrant
         Object.assign(btn.style, {
             position: 'absolute',
             display: 'none',
-            width: '100px',
-            height: '100px',
-            borderRadius: '50%',
-            background: 'rgba(255, 0, 255, 0.2)',
-            border: '2px solid rgba(255, 0, 255, 0.5)',
-            color: '#fff',
-            fontSize: '18px',
+            flexDirection: 'column',
+            width: '50vw',
+            height: '60vh',
+            top: '0',
+            right: '0',
+            borderRadius: '0 0 0 60px',
+            background: 'rgba(255, 0, 255, 0.03)',
+            borderLeft: '2px dashed rgba(255, 0, 255, 0.1)',
+            borderBottom: '2px dashed rgba(255, 0, 255, 0.1)',
+            color: 'rgba(255, 255, 255, 0.1)',
+            fontSize: '32px',
             fontWeight: 'bold',
-            textAlign: 'center',
-            lineHeight: '100px',
+            display: 'none', // Initial
+            alignItems: 'center',
+            justifyContent: 'center',
             pointerEvents: 'auto',
             userSelect: 'none',
-            zIndex: '1000',
-            boxShadow: '0 0 15px rgba(255, 0, 255, 0.3)',
-            transition: 'transform 0.1s, background 0.1s'
+            zIndex: '1500',
+            boxShadow: 'inset -20px -20px 40px rgba(255, 0, 255, 0.05)',
+            transition: 'background 0.2s, color 0.2s'
         });
 
         document.body.appendChild(btn);
@@ -85,8 +90,8 @@ class VirtualJoystickManager {
             if (state.touchId === null) {
                 state.touchId = e.changedTouches[0].identifier;
                 state.active = true;
-                btn.style.background = 'rgba(255, 0, 255, 0.5)';
-                btn.style.transform = 'scale(0.9)';
+                btn.style.background = 'rgba(255, 0, 255, 0.15)';
+                btn.style.color = 'rgba(255, 255, 255, 0.6)';
                 if (window.game && window.game.input) window.game.input.virtualBeamButton = true;
             }
             e.preventDefault();
@@ -97,8 +102,8 @@ class VirtualJoystickManager {
                 if (e.changedTouches[i].identifier === state.touchId) {
                     state.touchId = null;
                     state.active = false;
-                    btn.style.background = 'rgba(255, 0, 255, 0.2)';
-                    btn.style.transform = 'scale(1)';
+                    btn.style.background = 'rgba(255, 0, 255, 0.03)';
+                    btn.style.color = 'rgba(255, 255, 255, 0.1)';
                     if (window.game && window.game.input) window.game.input.virtualBeamButton = false;
                 }
             }
@@ -132,11 +137,7 @@ class VirtualJoystickManager {
         });
         // Update placeholders positions after resizing
         if (this.beamBtn) {
-            const btnSize = Math.round(this.maxRadius * 1.2);
-            this.beamBtn.element.style.width = btnSize + 'px';
-            this.beamBtn.element.style.height = btnSize + 'px';
-            this.beamBtn.element.style.lineHeight = btnSize + 'px';
-            this.beamBtn.element.style.fontSize = Math.round(btnSize * 0.2) + 'px';
+            this.beamBtn.element.style.fontSize = Math.round(window.innerHeight * 0.04) + 'px';
         }
         this._updatePlaceholders();
     }
@@ -203,12 +204,7 @@ class VirtualJoystickManager {
 
         // Beam button position
         if (mode === 'touch') {
-            const rightX = Math.max(20, window.innerWidth - (this.maxRadius * 2) - 20);
-            const top = Math.max(20, window.innerHeight - (this.maxRadius * 2) - 20);
-
-            this.beamBtn.element.style.display = 'block';
-            this.beamBtn.element.style.left = (rightX + this.maxRadius - parseInt(this.beamBtn.element.style.width) / 2) + 'px';
-            this.beamBtn.element.style.top = (top - parseInt(this.beamBtn.element.style.height) - 60) + 'px';
+            this.beamBtn.element.style.display = 'flex';
         } else {
             this.beamBtn.element.style.display = 'none';
         }
