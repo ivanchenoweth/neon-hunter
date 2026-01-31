@@ -737,36 +737,16 @@ class Game {
                 this.player.beamChargeTime = this.player.maxBeamChargeTime;
             }
 
-            this.player.beamLength = (this.player.beamChargeTime / this.player.maxBeamChargeTime) * this.player.maxBeamLength;
+            const progress = this.player.beamChargeTime / this.player.maxBeamChargeTime;
+            // Mixed linear + quadratic growth: starts moving immediately (30% linear) 
+            // and accelerates towards the end (70% quadratic)
+            this.player.beamLength = (progress * 0.3 + Math.pow(progress, 2) * 0.7) * this.player.maxBeamLength;
 
             // Play throttled charge sound
             this.beamSoundTimer += deltaTime;
             if (this.beamSoundTimer > 100) {
-                this.sound.playBeamCharge(this.player.beamChargeTime / this.player.maxBeamChargeTime);
+                this.sound.playBeamCharge(progress);
                 this.beamSoundTimer = 0;
-            }
-
-            // Check for collision at current tip in world space
-            const tipX = this.player.x + this.player.fireDirection.x * this.player.beamLength;
-            const tipY = this.player.y + this.player.fireDirection.y * this.player.beamLength;
-
-            // Collision check against enemies
-            let hitEnemy = null;
-            for (const enemy of this.enemies) {
-                const dx = tipX - enemy.x;
-                const dy = tipY - enemy.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-                if (dist < enemy.size / 2 + 10) {
-                    hitEnemy = enemy;
-                    break;
-                }
-            }
-
-            if (hitEnemy) {
-                this.triggerBeamExplosion(tipX, tipY, this.player.beamLength);
-                this.player.isChargingBeam = false;
-                this.player.beamChargeTime = 0;
-                this.player.beamLength = 0;
             }
         } else if (this.player.isChargingBeam) {
             // Released!
@@ -789,38 +769,20 @@ class Game {
         this.sound.playBeamExplosion();
         // Removed camera shake as per user request
 
-        // Destroy enemies in radius using Spatial Grid for performance
-        const searchBounds = {
-            x: x - radius - 50,
-            y: y - radius - 50,
-            width: radius * 2 + 100,
-            height: radius * 2 + 100
-        };
+        // Teleport player to the laser beam tip
+        this.player.x = x;
+        this.player.y = y;
 
-        const potentialEnemies = this.grid.retrieveByBounds(searchBounds);
+        // Clamp player position within world boundaries after teleport
+        const halfWidth = this.worldWidth / 2;
+        const halfHeight = this.worldHeight / 2;
+        this.player.x = Math.max(-halfWidth + this.player.radius, Math.min(halfWidth - this.player.radius, this.player.x));
+        this.player.y = Math.max(-halfHeight + this.player.radius, Math.min(halfHeight - this.player.radius, this.player.y));
 
-        potentialEnemies.forEach(enemy => {
-            if (enemy instanceof Enemy && !enemy.markedForDeletion) {
-                const dx = x - enemy.x;
-                const dy = y - enemy.y;
-                const distSq = dx * dx + dy * dy;
-                const checkDist = radius + enemy.size / 2;
+        // Create a dash trail effect between old and new position
+        // Potential improvement: add particles along the path
+        this.createExplosion(x, y, '#ff00ff', 40);
 
-                if (distSq < checkDist * checkDist) {
-                    enemy.markedForDeletion = true;
-                    this.score += 25;
-                    this.enemiesDestroyed++; // Missing previously
-                    this.warpLevelKillCount++; // Missing previously, caused the stuck progress
-                    this.updateScore();
-                    this.createExplosion(enemy.x, enemy.y, enemy.color, 15);
-
-                    // Check for level up immediately
-                    if (this.warpLevelKillCount >= this.killQuota && this.warpMessageTimer <= 0) {
-                        this.nextLevel();
-                    }
-                }
-            }
-        });
 
         // Add a temporary ripple particle for the explosion range
         for (let i = 0; i < 360; i += 20) {
@@ -872,7 +834,7 @@ class Game {
             shouldShoot = this.input.mouseDown;
         }
 
-        if (shouldShoot && this.shotTimer <= 0 && !this.player.isChargingBeam) {
+        if (shouldShoot && this.shotTimer <= 0) {
             this.shoot(screenMouseX, screenMouseY);
             this.shotTimer = this.shotInterval;
         }
@@ -1052,9 +1014,9 @@ class Game {
         const spawnInterval = this.enemies.length === 0 ? this.enemyInterval / 2 : this.enemyInterval;
 
         if (this.enemyTimer > spawnInterval && this.enemies.length < 60) {
-            if (this.warpLevelKillCount < this.killQuota) {
-                // We keep spawning regardless of enemiesSpawnedInLevel, 
-                // because some enemies might have been "lost" or killed without counting.
+            if (this.enemiesSpawnedInLevel < this.killQuota) {
+                // Limit the total Number of enemies that can exist in a level
+                // so the player can actually clear the screen as they progress.
                 this.enemies.push(this.enemyPool.get(this));
                 this.enemiesSpawnedInLevel++;
                 this.enemyTimer = 0;
@@ -1092,7 +1054,7 @@ class Game {
                             this.score += 10;
                             this.enemiesDestroyed++;
                             this.warpLevelKillCount++;
-                            if (this.warpLevelKillCount >= this.killQuota && this.warpMessageTimer <= 0) {
+                            if (this.warpLevelKillCount >= this.killQuota && this.enemies.length <= 1 && this.warpMessageTimer <= 0) {
                                 this.nextLevel();
                             }
                             this.updateScore();

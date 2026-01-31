@@ -20,9 +20,9 @@ class Player {
         // Energy Rod / Laser Charge System
         this.isChargingBeam = false;
         this.beamChargeTime = 0;
-        this.maxBeamChargeTime = 3000; // 3 seconds to max charge
+        this.maxBeamChargeTime = 1500; // 1.5 seconds to max charge
         this.beamLength = 0;
-        this.maxBeamLength = 600; // Maximum distance of the laser
+        this.maxBeamLength = 2000; // Maximum distance of the laser (increased to reach beyond spawn area)
     }
 
     /**

@@ -99,7 +99,7 @@ class Enemy {
 
             // Count collision as a kill for progress (User Request)
             this.game.warpLevelKillCount++;
-            if (this.game.warpLevelKillCount >= this.game.killQuota && this.game.warpMessageTimer <= 0) {
+            if (this.game.warpLevelKillCount >= this.game.killQuota && this.game.enemies.length <= 1 && this.game.warpMessageTimer <= 0) {
                 this.game.nextLevel();
             }
 
