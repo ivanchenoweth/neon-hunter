@@ -113,7 +113,7 @@ class Game {
         };
 
         // Canvas Interaction
-        this.canvas.addEventListener('mousedown', (e) => this.handleCanvasClick(e));
+        this.canvas.addEventListener('pointerdown', (e) => this.handleCanvasClick(e));
 
         // Menu Navigation State
         this.menuSelection = 2; // Default to 'Touch' (index 2) on start
@@ -156,14 +156,13 @@ class Game {
         this.blurCanvas.width = this.bloomCanvas.width;
         this.blurCanvas.height = this.bloomCanvas.height;
 
-        this.camera.width = this.width;
-        this.camera.height = this.height;
-        this.camera.zoom = window.zoomLevel * 2.0; // Apply standard scaling multiplier
+        this.camera.zoom = (window.zoomLevel || 1.0) * 2.0;
 
         // Update UI positions
-        // Keep pause button at top left
-        this.pauseBtnBounds.x = 20;
-        this.pauseBtnBounds.y = 20;
+        if (this.pauseBtnBounds) {
+            this.pauseBtnBounds.x = 20;
+            this.pauseBtnBounds.y = 20;
+        }
     }
 
     tryEnterFullscreen() {
@@ -384,21 +383,21 @@ class Game {
             for (let m of modes) {
                 const b = m.bounds;
                 if (mouseX >= b.x && mouseX <= b.x + b.w && mouseY >= b.y && mouseY <= b.y + b.h) {
-                    // Trigger Explosion
+                    // 1. Enter Fullscreen IMMEDIATELY to capture user gesture
+                    const el = document.documentElement;
+                    const rfs = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
+                    if (rfs) {
+                        rfs.call(el).catch(err => console.log('Fullscreen denied:', err));
+                    }
+
+                    // 2. Trigger Explosion
                     this.triggerExplosion(b.x + b.w / 2, b.y + b.h / 2, m.color, 30);
 
-                    // Set Mode
+                    // 3. Set Mode
                     window.inputMode = m.mode;
                     window.dispatchEvent(new Event('inputModeChanged'));
 
-                    // Enter Fullscreen
-                    const canvas = this.canvas;
-                    const rfs = canvas.requestFullscreen || canvas.webkitRequestFullscreen || canvas.mozRequestFullScreen || canvas.msRequestFullscreen;
-                    if (rfs) {
-                        rfs.call(canvas).catch(err => console.log('Fullscreen denied:', err));
-                    }
-
-                    // Start Game or Resume
+                    // 4. Start Game or Resume
                     if (this.sessionActive) {
                         this.gameState = this.states.PLAYING;
                     } else {
@@ -1275,21 +1274,24 @@ class Game {
         }
 
         // Pause Button (Visible in Playing/Paused)
-        // Pause Button (Visible in Playing/Paused)
         if (this.gameState === this.states.PLAYING || this.gameState === this.states.PAUSED) {
             const pb = this.pauseBtnBounds;
             this.ctx.save();
-            this.ctx.globalAlpha = 0.5; // 50% Alpha as requested
 
+            // Background for better visibility
+            this.ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+            this.ctx.fillRect(pb.x, pb.y, pb.w, pb.h);
+
+            this.ctx.globalAlpha = 0.8;
             this.ctx.strokeStyle = '#ffffff';
-            this.ctx.lineWidth = 3;
+            this.ctx.lineWidth = 4;
             this.ctx.strokeRect(pb.x, pb.y, pb.w, pb.h);
 
             // Draw Pause Icon (||)
             this.ctx.fillStyle = '#ffffff';
-            const iconW = 8;
-            const iconH = 30;
-            const gap = 12;
+            const iconW = 10;
+            const iconH = 34;
+            const gap = 14;
             this.ctx.fillRect(pb.x + (pb.w - iconW * 2 - gap) / 2, pb.y + (pb.h - iconH) / 2, iconW, iconH);
             this.ctx.fillRect(pb.x + (pb.w - iconW * 2 - gap) / 2 + iconW + gap, pb.y + (pb.h - iconH) / 2, iconW, iconH);
             this.ctx.restore();
