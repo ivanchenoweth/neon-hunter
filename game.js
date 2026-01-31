@@ -113,7 +113,7 @@ class Game {
         };
 
         // Canvas Interaction
-        this.canvas.addEventListener('pointerdown', (e) => this.handleCanvasClick(e));
+        this.canvas.addEventListener('pointerup', (e) => this.handleCanvasClick(e));
 
         // Menu Navigation State
         this.menuSelection = 2; // Default to 'Touch' (index 2) on start
