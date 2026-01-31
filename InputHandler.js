@@ -108,15 +108,15 @@ class InputHandler {
 
     _startJoystickPoll() {
         const poll = () => {
-            if (window.virtualJoysticks) {
-                const l = window.virtualJoysticks.left;
-                const r = window.virtualJoysticks.right;
-                this.joystickLeft.x = l ? l.x : 0;
-                this.joystickLeft.y = l ? l.y : 0;
-                this.joystickLeft.active = l ? l.isActive() : false;
-                this.joystickRight.x = r ? r.x : 0;
-                this.joystickRight.y = r ? r.y : 0;
-                this.joystickRight.active = r ? r.isActive() : false;
+            const vc = window.virtualControls;
+            if (vc) {
+                this.joystickLeft.x = vc.left.x;
+                this.joystickLeft.y = vc.left.y;
+                this.joystickLeft.active = vc.left.active;
+
+                this.joystickRight.x = vc.right.x;
+                this.joystickRight.y = vc.right.y;
+                this.joystickRight.active = vc.right.active;
                 // Map right joystick to aiming/shooting only if input mode is touch
                 const deadzone = 0.15;
                 const modeNow = window.inputMode || 'keyboard';

@@ -31,47 +31,6 @@
             background: radial-gradient(circle at center, #1a1a24 0%, #000000 100%);
         }
 
-        /* Virtual joystick styles */
-        .vj-container {
-            position: absolute;
-            width: 120px;
-            height: 120px;
-            pointer-events: none;
-            display: none;
-            z-index: 2000;
-            user-select: none;
-        }
-
-        .vj-bg {
-            position: absolute;
-            left: 0;
-            top: 0;
-            right: 0;
-            bottom: 0;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px dashed rgba(255, 255, 255, 0.06);
-            box-shadow: 0 0 12px rgba(0, 255, 136, 0.04);
-            opacity: 0.9;
-            pointer-events: none;
-        }
-
-        .vj-knob {
-            position: absolute;
-            left: 50%;
-            top: 50%;
-            width: 44px;
-            height: 44px;
-            margin-left: -22px;
-            margin-top: -22px;
-            border-radius: 50%;
-            background: rgba(0, 255, 136, 0.16);
-            border: 2px solid rgba(0, 255, 136, 0.35);
-            transform: translate(0px, 0px);
-            transition: transform 0s linear;
-            pointer-events: none;
-        }
-
         /* Input mode overlay */
         .input-overlay {
             position: absolute;
@@ -239,30 +198,10 @@
 </head>
 
 <body>
-    <div id="version-info" style="position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 9999; text-align: center;">
+    <div id="version-info"
+        style="position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 9999; text-align: center;">
         <span class="version-badge">v1.22.0-super-phoenix</span>
         <div class="version-meta">feat/35-new-firing • 2026-01-31 14:52</div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
-    </div>
     </div>
 
     <canvas id="gameCanvas"></canvas>

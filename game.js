@@ -94,8 +94,8 @@ class Game {
         this.maxLives = 5;  // Track max lives for speed calculation
         this.baseSpeed = 110;  // Base player speed
 
-        // Pause button bounds (Top Right)
-        this.pauseBtnBounds = { x: this.width - 60, y: 20, w: 40, h: 40 };
+        // Pause button bounds (Top Left, Larger)
+        this.pauseBtnBounds = { x: 20, y: 20, w: 60, h: 60 };
 
         // Initial Zoom
         window.zoomLevel = window.zoomLevel || 1.0;
@@ -161,7 +161,9 @@ class Game {
         this.camera.zoom = window.zoomLevel * 2.0; // Apply standard scaling multiplier
 
         // Update UI positions
-        this.pauseBtnBounds.x = this.width - 60;
+        // Keep pause button at top left
+        this.pauseBtnBounds.x = 20;
+        this.pauseBtnBounds.y = 20;
     }
 
     tryEnterFullscreen() {
@@ -1235,13 +1237,18 @@ class Game {
         this.ctx.font = 'bold 20px "Outfit", sans-serif';
 
         this.ctx.fillStyle = '#00ccff';
-        this.ctx.fillText(`Score: ${this.score}`, 20, 30);
+        // HUD Text - Offset downward to avoid Pause Button (y=20 to 80)
+        const hudYOffset = 100;
+        this.ctx.fillText(`Score: ${this.score}`, 20, hudYOffset);
 
         this.ctx.fillStyle = '#ffff00';
-        this.ctx.fillText(`Coins: ${this.coins}`, 20, 60);
+        this.ctx.fillText(`Coins: ${this.coins}`, 20, hudYOffset + 30);
 
         this.ctx.fillStyle = '#ff4444';
-        this.ctx.fillText(`Lives: ${'❤️'.repeat(this.lives)}`, 20, 90);
+        this.ctx.fillText(`Lives: ${'❤️'.repeat(this.lives)}`, 20, hudYOffset + 60);
+
+        this.ctx.fillStyle = '#00ff88';
+        this.ctx.fillText(`Warp ${this.warpLevel} Process: ${this.warpLevelKillCount} / ${this.killQuota}`, 20, hudYOffset + 90);
 
         // Conditional Debug HUD
         if (this.showDebugHUD) {
@@ -1252,7 +1259,6 @@ class Game {
 
             this.ctx.fillStyle = '#00ff88';
             this.ctx.fillText(`FPS: ${this.fps}`, 20, 150);
-            this.ctx.fillText(`Warp ${this.warpLevel} Progress: ${this.warpLevelKillCount} / ${this.killQuota}`, 20, 180);
 
             if (this.warpTimer > 30000) this.ctx.fillStyle = '#ff4444';
             else this.ctx.fillStyle = '#00ff88';
@@ -1269,17 +1275,28 @@ class Game {
         }
 
         // Pause Button (Visible in Playing/Paused)
+        // Pause Button (Visible in Playing/Paused)
         if (this.gameState === this.states.PLAYING || this.gameState === this.states.PAUSED) {
             const pb = this.pauseBtnBounds;
+            this.ctx.save();
+            this.ctx.globalAlpha = 0.5; // 50% Alpha as requested
+
             this.ctx.strokeStyle = '#ffffff';
-            this.ctx.lineWidth = 2;
+            this.ctx.lineWidth = 3;
             this.ctx.strokeRect(pb.x, pb.y, pb.w, pb.h);
 
             // Draw Pause Icon (||)
             this.ctx.fillStyle = '#ffffff';
-            this.ctx.fillRect(pb.x + 12, pb.y + 10, 6, 20);
-            this.ctx.fillRect(pb.x + 22, pb.y + 10, 6, 20);
+            const iconW = 8;
+            const iconH = 30;
+            const gap = 12;
+            this.ctx.fillRect(pb.x + (pb.w - iconW * 2 - gap) / 2, pb.y + (pb.h - iconH) / 2, iconW, iconH);
+            this.ctx.fillRect(pb.x + (pb.w - iconW * 2 - gap) / 2 + iconW + gap, pb.y + (pb.h - iconH) / 2, iconW, iconH);
+            this.ctx.restore();
         }
+
+        // Draw Virtual Controls (Touch Mode Only)
+        this.drawVirtualControls(this.ctx);
 
         // UI Screens
         if (this.gameState === this.states.INITIAL) {
@@ -1294,6 +1311,75 @@ class Game {
         if (this.warpMessageTimer > 0) {
             this.drawWarpText(this.ctx);
         }
+    }
+
+    drawVirtualControls(ctx) {
+        const vc = window.virtualControls;
+        if (!vc || window.inputMode !== 'touch') return;
+
+        ctx.save();
+
+        // 1. Draw Beam Button Area
+        const beam = vc.beam;
+        const br = beam.rect;
+
+        ctx.globalAlpha = beam.active ? 0.4 : 0.15;
+        ctx.fillStyle = '#ff00ff';
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(br.x, br.y, br.w, br.h, [0, 0, 0, 40]);
+        else ctx.rect(br.x, br.y, br.w, br.h);
+        ctx.fill();
+
+        ctx.strokeStyle = '#ff00ff';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        // Beam Text
+        ctx.globalAlpha = 1.0;
+        ctx.fillStyle = '#ffffff';
+        ctx.font = `bold ${Math.round(this.height * 0.04)}px "Outfit", sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('TELEPORT BEAM', br.x + br.w / 2, br.h - 50);
+
+        // 2. Draw Joysticks
+        const drawJoy = (joy, side) => {
+            const centerX = joy.touchId !== null ? joy.baseX : joy.placeholderX;
+            const centerY = joy.touchId !== null ? joy.baseY : joy.placeholderY;
+
+            // Outer Ring
+            ctx.globalAlpha = joy.touchId !== null ? 0.3 : 0.15; // 30% max alpha
+            ctx.strokeStyle = '#00ff88';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, vc.maxRadius, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Inner Knob
+            const kx = centerX + joy.x * vc.maxRadius;
+            const ky = centerY + joy.y * vc.maxRadius;
+
+            ctx.globalAlpha = joy.touchId !== null ? 0.3 : 0.15; // 30% alpha as requested
+            ctx.fillStyle = '#00ff88';
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#00ff88';
+            ctx.beginPath();
+            ctx.arc(kx, ky, vc.maxRadius * 0.4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // Knob border
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+        };
+
+        drawJoy(vc.left, 'left');
+        drawJoy(vc.right, 'right');
+
+        ctx.restore();
     }
 
     nextLevel() {

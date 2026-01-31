@@ -1,151 +1,66 @@
-class VirtualJoystickManager {
+class VirtualControls {
     constructor() {
-        this.maxRadius = 60; // pixels
-        this.left = this._createJoystick('left');
-        this.right = this._createJoystick('right');
-        this.beamBtn = this._createBeamButton();
-        this._bindEvents();
-        window.virtualJoysticks = { left: this.left.api, right: this.right.api, beam: this.beamBtn.api };
-        // React to input mode changes (main.js sets window.inputMode)
-        this._updatePlaceholders();
-        window.addEventListener('inputModeChanged', () => this._updatePlaceholders());
-        window.addEventListener('resize', () => this._updatePlaceholders());
-        // Sizes responsive to device viewport
-        this._updateSizes();
-        window.addEventListener('resize', () => this._updateSizes());
-    }
+        this.maxRadius = 70;
+        this.inputMode = 'keyboard';
 
-    _createJoystick(side) {
-        const container = document.createElement('div');
-        container.className = `vj-container vj-${side}`;
-        const bg = document.createElement('div');
-        bg.className = 'vj-bg';
-        const knob = document.createElement('div');
-        knob.className = 'vj-knob';
-        container.appendChild(bg);
-        container.appendChild(knob);
-        document.body.appendChild(container);
-
-        const state = {
+        this.left = {
+            active: false,
             touchId: null,
             baseX: 0,
             baseY: 0,
             x: 0,
             y: 0,
+            placeholderX: 0,
+            placeholderY: 0
+        };
+
+        this.right = {
             active: false,
+            touchId: null,
+            baseX: 0,
+            baseY: 0,
+            x: 0,
+            y: 0,
+            placeholderX: 0,
+            placeholderY: 0
         };
 
-        const api = {
-            get x() { return state.x; },
-            get y() { return state.y; },
-            isActive: () => state.active
+        this.beam = {
+            active: false,
+            touchId: null,
+            rect: { x: 0, y: 0, w: 0, h: 0 }
         };
 
-        // initial inline sizing will be set by _updateSizes
-        container.style.position = 'absolute';
-        container.style.display = 'none';
-
-        return { side, container, bg, knob, state, api };
-    }
-
-    _createBeamButton() {
-        const btn = document.createElement('div');
-        btn.className = 'vj-beam-btn';
-        btn.innerHTML = 'BEAM';
-
-        // Styling for a large area covering top-right quadrant
-        Object.assign(btn.style, {
-            position: 'absolute',
-            display: 'none',
-            flexDirection: 'column',
-            width: '50vw',
-            height: '60vh',
-            top: '0',
-            right: '0',
-            borderRadius: '0 0 0 60px',
-            background: 'rgba(255, 0, 255, 0.05)',
-            borderLeft: '2px dashed rgba(255, 0, 255, 0.2)',
-            borderBottom: '2px dashed rgba(255, 0, 255, 0.2)',
-            color: 'rgba(255, 0, 255, 0.3)',
-            fontSize: '32px',
-            fontWeight: 'bold',
-            display: 'none', // Initial
-            alignItems: 'center',
-            justifyContent: 'center',
-            pointerEvents: 'auto',
-            userSelect: 'none',
-            zIndex: '2500', // Above joysticks (2000)
-            boxShadow: 'inset -20px -20px 60px rgba(255, 0, 255, 0.08)',
-            transition: 'background 0.2s, color 0.2s, border 0.2s'
+        this._bindEvents();
+        this._updateLayout();
+        window.addEventListener('resize', () => this._updateLayout());
+        window.addEventListener('inputModeChanged', () => {
+            this.inputMode = window.inputMode || 'keyboard';
         });
 
-        document.body.appendChild(btn);
-
-        const state = { active: false, touchId: null };
-        const api = {
-            isActive: () => state.active
-        };
-
-        btn.addEventListener('touchstart', (e) => {
-            if (state.touchId === null) {
-                state.touchId = e.changedTouches[0].identifier;
-                state.active = true;
-                btn.style.background = 'rgba(255, 0, 255, 0.25)';
-                btn.style.color = 'rgba(255, 255, 255, 0.8)';
-                btn.style.borderLeft = '2px solid rgba(255, 0, 255, 0.6)';
-                btn.style.borderBottom = '2px solid rgba(255, 0, 255, 0.6)';
-                if (window.game && window.game.input) window.game.input.virtualBeamButton = true;
-            }
-            e.preventDefault();
-            e.stopPropagation(); // Prevent spawning a joystick here
-        }, { passive: false });
-
-        const handleEnd = (e) => {
-            for (let i = 0; i < e.changedTouches.length; i++) {
-                if (e.changedTouches[i].identifier === state.touchId) {
-                    state.touchId = null;
-                    state.active = false;
-                    btn.style.background = 'rgba(255, 0, 255, 0.05)';
-                    btn.style.color = 'rgba(255, 0, 255, 0.3)';
-                    btn.style.borderLeft = '2px dashed rgba(255, 0, 255, 0.2)';
-                    btn.style.borderBottom = '2px dashed rgba(255, 0, 255, 0.2)';
-                    if (window.game && window.game.input) window.game.input.virtualBeamButton = false;
-                }
-                e.stopPropagation();
-            }
-        };
-
-        btn.addEventListener('touchend', handleEnd);
-        btn.addEventListener('touchcancel', handleEnd);
-
-        return { element: btn, state, api };
+        // Expose to global for InputHandler and Game
+        window.virtualControls = this;
     }
 
-    _updateSizes() {
-        // Compute maxRadius relative to device viewport (about 9% of smaller side)
-        const base = Math.min(window.innerWidth, window.innerHeight || 600);
-        const computedRadius = Math.round(base * 0.09);
-        // Clamp to reasonable values
-        this.maxRadius = Math.max(36, Math.min(110, computedRadius));
+    _updateLayout() {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
 
-        const knobSize = Math.round(this.maxRadius * 0.6);
-        const containerSize = this.maxRadius * 2;
+        // Define Beam area: top-right 50% width, 40% height
+        this.beam.rect = {
+            x: w / 2,
+            y: 0,
+            w: w / 2,
+            h: h * 0.4
+        };
 
-        [this.left, this.right].forEach(j => {
-            j.container.style.width = containerSize + 'px';
-            j.container.style.height = containerSize + 'px';
-            j.bg.style.width = '100%';
-            j.bg.style.height = '100%';
-            j.knob.style.width = knobSize + 'px';
-            j.knob.style.height = knobSize + 'px';
-            j.knob.style.marginLeft = -(knobSize / 2) + 'px';
-            j.knob.style.marginTop = -(knobSize / 2) + 'px';
-        });
-        // Update placeholders positions after resizing
-        if (this.beamBtn) {
-            this.beamBtn.element.style.fontSize = Math.round(window.innerHeight * 0.04) + 'px';
-        }
-        this._updatePlaceholders();
+        // Static placeholder positions for joysticks
+        const margin = 80;
+        this.left.placeholderX = margin + this.maxRadius;
+        this.left.placeholderY = h - margin - this.maxRadius;
+
+        this.right.placeholderX = w - margin - this.maxRadius;
+        this.right.placeholderY = h - margin - this.maxRadius;
     }
 
     _bindEvents() {
@@ -153,127 +68,105 @@ class VirtualJoystickManager {
         window.addEventListener('touchmove', (e) => this._onTouchMove(e), { passive: false });
         window.addEventListener('touchend', (e) => this._onTouchEnd(e), { passive: false });
         window.addEventListener('touchcancel', (e) => this._onTouchEnd(e), { passive: false });
-        window.addEventListener('resize', () => this._hideAll());
     }
 
     _onTouchStart(e) {
-        // Ignore touches if player selected keyboard mode
-        if (window.inputMode && window.inputMode !== 'touch') return;
+        if (this.inputMode !== 'touch') return;
+
+        // Deactivate controls if not in playing state (allows clicking menu buttons)
+        if (window.game && window.game.gameState !== window.game.states.PLAYING) return;
+
+        let handled = false;
+        const h = window.innerHeight;
+        const w = window.innerWidth;
+
         for (let i = 0; i < e.changedTouches.length; i++) {
             const t = e.changedTouches[i];
-            const side = t.clientX < window.innerWidth / 2 ? 'left' : 'right';
-            const joy = side === 'left' ? this.left : this.right;
-            if (joy.state.touchId === null) {
-                joy.state.touchId = t.identifier;
-                joy.state.baseX = t.clientX;
-                joy.state.baseY = t.clientY;
-                joy.state.active = true;
-                joy.state.x = 0;
-                joy.state.y = 0;
-                joy.container.style.display = 'block';
-                joy.container.style.left = (joy.state.baseX - this.maxRadius) + 'px';
-                joy.container.style.top = (joy.state.baseY - this.maxRadius) + 'px';
-                joy.knob.style.transform = `translate(0px, 0px)`;
+            const tx = t.clientX;
+            const ty = t.clientY;
+
+            // 1. Check Beam Button Area
+            const br = this.beam.rect;
+            if (tx >= br.x && ty <= br.h) {
+                if (this.beam.touchId === null) {
+                    this.beam.touchId = t.identifier;
+                    this.beam.active = true;
+                    if (window.game && window.game.input) window.game.input.virtualBeamButton = true;
+                }
+                handled = true;
+                continue;
+            }
+
+            // 2. Check Joysticks - Limit hit area to bottom 60% of screen to avoid menu buttons
+            if (ty > h * 0.4) {
+                const side = tx < w / 2 ? 'left' : 'right';
+                const joy = this[side];
+
+                if (joy.touchId === null) {
+                    joy.touchId = t.identifier;
+                    joy.active = true;
+                    joy.baseX = tx;
+                    joy.baseY = ty;
+                    joy.x = 0;
+                    joy.y = 0;
+                    handled = true;
+                }
             }
         }
-    }
 
-    _updatePlaceholders() {
-        const mode = window.inputMode || 'keyboard';
-        // Show faint placeholders only for touch mode and when no active touch
-        const showLeft = mode === 'touch' && this.left.state.touchId === null;
-        const showRight = mode === 'touch' && this.right.state.touchId === null;
-
-        if (showLeft) {
-            const leftX = 20; // px from left
-            const top = Math.max(20, window.innerHeight - (this.maxRadius * 2) - 20); // place near bottom
-            this.left.container.style.display = 'block';
-            this.left.container.style.left = leftX + 'px';
-            this.left.container.style.top = top + 'px';
-            this.left.bg.style.background = 'rgba(255,255,255,0.015)';
-            this.left.bg.style.border = '1px dashed rgba(255,255,255,0.06)';
-        } else if (!this.left.state.active) {
-            this.left.container.style.display = 'none';
-        }
-
-        if (showRight) {
-            const rightX = Math.max(20, window.innerWidth - (this.maxRadius * 2) - 20);
-            const top = Math.max(20, window.innerHeight - (this.maxRadius * 2) - 20);
-            this.right.container.style.display = 'block';
-            this.right.container.style.left = rightX + 'px';
-            this.right.container.style.top = top + 'px';
-            this.right.bg.style.background = 'rgba(255,255,255,0.015)';
-            this.right.bg.style.border = '1px dashed rgba(255,255,255,0.06)';
-        } else if (!this.right.state.active) {
-            this.right.container.style.display = 'none';
-        }
-
-        // Beam button position
-        if (mode === 'touch') {
-            this.beamBtn.element.style.display = 'flex';
-        } else {
-            this.beamBtn.element.style.display = 'none';
-        }
+        // Only preventDefault if we are using the virtual controls
+        // This allows 'mousedown' events to still reach the canvas for menu buttons
+        if (handled) e.preventDefault();
     }
 
     _onTouchMove(e) {
-        let handled = false;
+        if (this.inputMode !== 'touch') return;
+
         for (let i = 0; i < e.changedTouches.length; i++) {
             const t = e.changedTouches[i];
-            const joy = this._findByTouchId(t.identifier);
-            if (!joy) continue;
-            handled = true;
-            const dx = t.clientX - joy.state.baseX;
-            const dy = t.clientY - joy.state.baseY;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            const maxR = this.maxRadius;
-            const clamped = dist > maxR ? maxR / dist : 1;
-            const nx = dx * clamped / maxR;
-            const ny = dy * clamped / maxR;
-            joy.state.x = nx; // -1..1
-            joy.state.y = ny; // -1..1
-            const knobX = nx * maxR;
-            const knobY = ny * maxR;
-            joy.knob.style.transform = `translate(${knobX}px, ${knobY}px)`;
+
+            // Handle joysticks
+            ['left', 'right'].forEach(side => {
+                const joy = this[side];
+                if (joy.touchId === t.identifier) {
+                    const dx = t.clientX - joy.baseX;
+                    const dy = t.clientY - joy.baseY;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    const clamped = dist > this.maxRadius ? this.maxRadius / dist : 1;
+
+                    joy.x = (dx * clamped) / this.maxRadius;
+                    joy.y = (dy * clamped) / this.maxRadius;
+                }
+            });
         }
-        if (handled) e.preventDefault();
+        e.preventDefault();
     }
 
     _onTouchEnd(e) {
         for (let i = 0; i < e.changedTouches.length; i++) {
             const t = e.changedTouches[i];
-            const joy = this._findByTouchId(t.identifier);
-            if (!joy) continue;
-            joy.state.touchId = null;
-            joy.state.active = false;
-            joy.state.x = 0;
-            joy.state.y = 0;
-            joy.container.style.display = 'none';
-            joy.knob.style.transform = `translate(0px, 0px)`;
+            const id = t.identifier;
+
+            if (this.beam.touchId === id) {
+                this.beam.touchId = null;
+                this.beam.active = false;
+                if (window.game && window.game.input) window.game.input.virtualBeamButton = false;
+            }
+
+            ['left', 'right'].forEach(side => {
+                const joy = this[side];
+                if (joy.touchId === id) {
+                    joy.touchId = null;
+                    joy.active = false;
+                    joy.x = 0;
+                    joy.y = 0;
+                }
+            });
         }
-    }
-
-    _findByTouchId(id) {
-        if (this.left.state.touchId === id) return this.left;
-        if (this.right.state.touchId === id) return this.right;
-        return null;
-    }
-
-    _hideAll() {
-        [this.left, this.right].forEach(j => {
-            j.container.style.display = 'none';
-            j.state.touchId = null;
-            j.state.active = false;
-            j.state.x = 0; j.state.y = 0;
-        });
     }
 }
 
-// Inicializa al cargar el script
+// Initialize Logic
 window.addEventListener('load', () => {
-    try {
-        new VirtualJoystickManager();
-    } catch (e) {
-        console.error('VirtualJoystick init error', e);
-    }
+    new VirtualControls();
 });
