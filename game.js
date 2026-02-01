@@ -48,6 +48,9 @@ class Game {
         this.canvas.height = this.height;
         window.addEventListener('resize', () => this.handleResize());
 
+        // Initial Zoom Level (1.0x baseline)
+        window.zoomLevel = window.zoomLevel || 1.0;
+
         this.input = new InputHandler();
         this.sound = new SoundController();
         this.camera = new Camera(this.width, this.height, window.zoomLevel || 1);
@@ -97,8 +100,6 @@ class Game {
         // Pause button bounds (Top Left, Larger)
         this.pauseBtnBounds = { x: 20, y: 20, w: 60, h: 60 };
 
-        // Initial Zoom
-        window.zoomLevel = window.zoomLevel || 1.0;
 
         // Button bounds for canvas interaction
         this.btnBounds = {
@@ -156,7 +157,7 @@ class Game {
         this.blurCanvas.width = this.bloomCanvas.width;
         this.blurCanvas.height = this.bloomCanvas.height;
 
-        this.camera.zoom = (window.zoomLevel || 1.0) * 2.0;
+        this.camera.zoom = (window.zoomLevel || 1.0);
 
         // Update UI positions
         if (this.pauseBtnBounds) {
@@ -357,7 +358,7 @@ class Game {
             if (mouseX >= bZoomOut.x && mouseX <= bZoomOut.x + bZoomOut.w && mouseY >= bZoomOut.y && mouseY <= bZoomOut.y + bZoomOut.h) {
                 if (window.zoomLevel > 0.5) {
                     window.zoomLevel = parseFloat((window.zoomLevel - 0.1).toFixed(1));
-                    this.camera.zoom = window.zoomLevel * 2.0;
+                    this.camera.zoom = window.zoomLevel;
                     this.triggerExplosion(bZoomOut.x + bZoomOut.w / 2, bZoomOut.y + bZoomOut.h / 2, '#ff8500', 10);
                 }
                 return;
@@ -367,7 +368,7 @@ class Game {
             if (mouseX >= bZoomIn.x && mouseX <= bZoomIn.x + bZoomIn.w && mouseY >= bZoomIn.y && mouseY <= bZoomIn.y + bZoomIn.h) {
                 if (window.zoomLevel < 2.0) {
                     window.zoomLevel = parseFloat((window.zoomLevel + 0.1).toFixed(1));
-                    this.camera.zoom = window.zoomLevel * 2.0;
+                    this.camera.zoom = window.zoomLevel;
                     this.triggerExplosion(bZoomIn.x + bZoomIn.w / 2, bZoomIn.y + bZoomIn.h / 2, '#ff8500', 10);
                 }
                 return;
@@ -739,9 +740,18 @@ class Game {
             }
 
             const progress = this.player.beamChargeTime / this.player.maxBeamChargeTime;
+
+            // Calculate distance to world edge in current direction
+            const maxDist = this.getDistanceToWorldEdge(
+                this.player.x,
+                this.player.y,
+                this.player.fireDirection.x,
+                this.player.fireDirection.y
+            );
+
             // Mixed linear + quadratic growth: starts moving immediately (30% linear) 
             // and accelerates towards the end (70% quadratic)
-            this.player.beamLength = (progress * 0.3 + Math.pow(progress, 2) * 0.7) * this.player.maxBeamLength;
+            this.player.beamLength = (progress * 0.3 + Math.pow(progress, 2) * 0.7) * maxDist;
 
             // Play throttled charge sound
             this.beamSoundTimer += deltaTime;
@@ -751,9 +761,10 @@ class Game {
             }
         } else if (this.player.isChargingBeam) {
             // Released!
+            const progress = this.player.beamChargeTime / this.player.maxBeamChargeTime;
             const tipX = this.player.x + this.player.fireDirection.x * this.player.beamLength;
             const tipY = this.player.y + this.player.fireDirection.y * this.player.beamLength;
-            this.triggerBeamExplosion(tipX, tipY, this.player.beamLength);
+            this.triggerBeamExplosion(tipX, tipY, progress);
 
             this.player.isChargingBeam = false;
             this.player.beamChargeTime = 0;
@@ -761,9 +772,32 @@ class Game {
         }
     }
 
-    triggerBeamExplosion(x, y, length) {
-        // Base radius 60, up to 240 at max length
-        const radius = 60 + (length / this.player.maxBeamLength) * 180;
+    getDistanceToWorldEdge(px, py, dx, dy) {
+        const halfW = this.worldWidth / 2;
+        const halfH = this.worldHeight / 2;
+
+        let tMin = 5000; // Large default safety
+
+        // Check X boundaries
+        if (dx > 0) {
+            tMin = Math.min(tMin, (halfW - px) / dx);
+        } else if (dx < 0) {
+            tMin = Math.min(tMin, (-halfW - px) / dx);
+        }
+
+        // Check Y boundaries
+        if (dy > 0) {
+            tMin = Math.min(tMin, (halfH - py) / dy);
+        } else if (dy < 0) {
+            tMin = Math.min(tMin, (-halfH - py) / dy);
+        }
+
+        return tMin;
+    }
+
+    triggerBeamExplosion(x, y, progress) {
+        // Base radius 60, up to 240 at max power
+        const radius = 60 + progress * 180;
 
         // Visual effect
         this.createExplosion(x, y, '#ff00ff', 60);
@@ -890,7 +924,7 @@ class Game {
                     // Zoom Out
                     if (window.zoomLevel > 0.5) {
                         window.zoomLevel = parseFloat((window.zoomLevel - 0.1).toFixed(1));
-                        this.camera.zoom = window.zoomLevel * 2.0;
+                        this.camera.zoom = window.zoomLevel;
                         const b = this.btnBounds.zoomOut;
                         this.triggerExplosion(b.x + b.w / 2, b.y + b.h / 2, '#ff8500', 10);
                     }
@@ -898,7 +932,7 @@ class Game {
                     // Zoom In
                     if (window.zoomLevel < 2.0) {
                         window.zoomLevel = parseFloat((window.zoomLevel + 0.1).toFixed(1));
-                        this.camera.zoom = window.zoomLevel * 2.0;
+                        this.camera.zoom = window.zoomLevel;
                         const b = this.btnBounds.zoomIn;
                         this.triggerExplosion(b.x + b.w / 2, b.y + b.h / 2, '#ff8500', 10);
                     }
@@ -1321,28 +1355,20 @@ class Game {
 
         ctx.save();
 
-        // 1. Draw Beam Button Area
+        // 1. Draw Beam Button Area (Subtle overlay for Minimap)
         const beam = vc.beam;
         const br = beam.rect;
 
-        ctx.globalAlpha = beam.active ? 0.4 : 0.15;
+        ctx.globalAlpha = beam.active ? 0.25 : 0.08;
         ctx.fillStyle = '#ff00ff';
         ctx.beginPath();
-        if (ctx.roundRect) ctx.roundRect(br.x, br.y, br.w, br.h, [0, 0, 0, 40]);
+        if (ctx.roundRect) ctx.roundRect(br.x, br.y, br.w, br.h, 12);
         else ctx.rect(br.x, br.y, br.w, br.h);
         ctx.fill();
 
         ctx.strokeStyle = '#ff00ff';
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 2;
         ctx.stroke();
-
-        // Beam Text
-        ctx.globalAlpha = 1.0;
-        ctx.fillStyle = '#ffffff';
-        ctx.font = `bold ${Math.round(this.height * 0.04)}px "Outfit", sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('TELEPORT BEAM', br.x + br.w / 2, br.h - 50);
 
         // 2. Draw Joysticks
         const drawJoy = (joy, side) => {
@@ -1350,7 +1376,7 @@ class Game {
             const centerY = joy.touchId !== null ? joy.baseY : joy.placeholderY;
 
             // Outer Ring
-            ctx.globalAlpha = joy.touchId !== null ? 0.3 : 0.15; // 30% max alpha
+            ctx.globalAlpha = joy.touchId !== null ? 0.2 : 0.08; // Reduced alpha
             ctx.strokeStyle = '#00ff88';
             ctx.lineWidth = 2;
             ctx.setLineDash([5, 5]);
@@ -1363,7 +1389,7 @@ class Game {
             const kx = centerX + joy.x * vc.maxRadius;
             const ky = centerY + joy.y * vc.maxRadius;
 
-            ctx.globalAlpha = joy.touchId !== null ? 0.3 : 0.15; // 30% alpha as requested
+            ctx.globalAlpha = joy.touchId !== null ? 0.2 : 0.08; // Reduced alpha
             ctx.fillStyle = '#00ff88';
             ctx.shadowBlur = 10;
             ctx.shadowColor = '#00ff88';

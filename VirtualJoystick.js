@@ -46,12 +46,14 @@ class VirtualControls {
         const w = window.innerWidth;
         const h = window.innerHeight;
 
-        // Define Beam area: top-right 50% width, 40% height
+        // Define Beam area: Match Minimap position/size (Top-Right)
+        const minimapSize = 200;
+        const minimapMargin = 20;
         this.beam.rect = {
-            x: w / 2,
-            y: 0,
-            w: w / 2,
-            h: h * 0.4
+            x: w - minimapSize - minimapMargin,
+            y: minimapMargin,
+            w: minimapSize,
+            h: minimapSize
         };
 
         // Static placeholder positions for joysticks
@@ -87,7 +89,7 @@ class VirtualControls {
 
             // 1. Check Beam Button Area
             const br = this.beam.rect;
-            if (tx >= br.x && ty <= br.h) {
+            if (tx >= br.x && tx <= br.x + br.w && ty >= br.y && ty <= br.y + br.h) {
                 if (this.beam.touchId === null) {
                     this.beam.touchId = t.identifier;
                     this.beam.active = true;
