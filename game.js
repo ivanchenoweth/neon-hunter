@@ -60,6 +60,10 @@ class Game {
         this.foods = [];
         this.enemies = [];
         this.bullets = [];
+        this.blockers = [];
+        for (let i = 0; i < 100; i++) {
+            this.blockers.push(new Blocker(this));
+        }
         this.showDebugHUD = false; // Toggle with game.toggleDebug()
         this.beamSoundTimer = 0;
         // Object Pools
@@ -76,7 +80,7 @@ class Game {
         this.grid = new SpatialGrid(this.worldWidth, this.worldHeight, 400); // 400px cells
 
         // Spawn initial food
-        for (let i = 0; i < 50; i++) {
+        for (let i = 0; i < 100; i++) {
             this.foods.push(this.foodPool.get(this));
         }
 
@@ -265,6 +269,14 @@ class Game {
             ctx.fillRect(ex - 2, ey - 2, 4, 4);
         });
 
+        // Draw blockers on minimap
+        ctx.fillStyle = '#00ff00';
+        this.blockers.forEach(blocker => {
+            const bx = centerX + blocker.x * scale;
+            const by = centerY + blocker.y * scale;
+            ctx.fillRect(bx - 1.5, by - 0.75, 3, 1.5);
+        });
+
         // Draw Laser Beam on minimap
         if (this.player.isChargingBeam && this.player.beamLength > 0) {
             ctx.strokeStyle = '#ff00ff';
@@ -295,6 +307,11 @@ class Game {
         this.enemiesDestroyed = 0;
         this.enemies = [];
         this.bullets = [];
+        this.blockers.forEach(b => {
+            b.x = (Math.random() - 0.5) * this.worldWidth;
+            b.y = (Math.random() - 0.5) * this.worldHeight;
+            b._avoidPlayerSpawn();
+        });
         this.foods = [];
         this.particles = [];
         this.enemyTimer = 0;
@@ -681,6 +698,7 @@ class Game {
 
         this.enemies.forEach(enemy => enemy.updateState(deltaTime));
         this.bullets.forEach(bullet => bullet.updateState(deltaTime));
+        this.blockers.forEach(blocker => blocker.updateState(deltaTime));
         this.foods.forEach(food => food.updateState(deltaTime));
 
         // 3. Gestionar Ciclo de Vida (Eliminaciones/Pools)
@@ -1057,7 +1075,7 @@ class Game {
                 this.enemyTimer = 0;
             }
         }
-        if (this.foods.length < 50) {
+        if (this.foods.length < 100) {
             this.foods.push(this.foodPool.get(this));
         }
     }
@@ -1065,6 +1083,7 @@ class Game {
     updateGrid() {
         this.grid.clear();
         this.enemies.forEach(enemy => this.grid.insert(enemy));
+        this.blockers.forEach(blocker => this.grid.insert(blocker));
         this.foods.forEach(food => {
             if (!food.isCaptured) this.grid.insert(food);
         });
@@ -1095,6 +1114,19 @@ class Game {
                             this.updateScore();
                             this.createExplosion(enemy.x, enemy.y, enemy.color);
                         }
+                    }
+                } else if (enemy instanceof Blocker && !bullet.markedForDeletion) {
+                    const dx = bullet.x - enemy.x;
+                    const dy = bullet.y - enemy.y;
+                    const cos = Math.cos(-enemy.angle);
+                    const sin = Math.sin(-enemy.angle);
+                    const localX = dx * cos - dy * sin;
+                    const localY = dx * sin + dy * cos;
+
+                    if (Math.abs(localX) < enemy.width / 2 && Math.abs(localY) < enemy.height / 2) {
+                        enemy.onHit(bullet);
+                        bullet.markedForDeletion = true;
+                        this.createExplosion(bullet.x, bullet.y, enemy.color, 3);
                     }
                 }
             });
@@ -1229,6 +1261,9 @@ class Game {
             } else if (ent instanceof Bullet) {
                 ent.draw(ctx);
                 ent.draw(bCtx); // Draw to bloom
+            } else if (ent instanceof Blocker) {
+                ent.draw(ctx);
+                ent.draw(bCtx); // Draw to bloom
             }
         });
 
@@ -1283,6 +1318,10 @@ class Game {
         this.ctx.fillStyle = '#00ff88';
         this.ctx.fillText(`Warp ${this.warpLevel} Process: ${this.warpLevelKillCount} / ${this.killQuota}`, 20, hudYOffset + 90);
 
+        // FPS Display (Always visible)
+        this.ctx.fillStyle = '#ffff00';
+        this.ctx.fillText(`FPS: ${this.fps}`, 20, hudYOffset + 120);
+
         // Conditional Debug HUD
         if (this.showDebugHUD) {
             const maxEnemySpeed = this.enemies.reduce((max, e) => Math.max(max, e.speed), 0);
@@ -1290,8 +1329,7 @@ class Game {
             const mm = Math.floor(seconds / 60).toString().padStart(2, '0');
             const ss = (seconds % 60).toString().padStart(2, '0');
 
-            this.ctx.fillStyle = '#00ff88';
-            this.ctx.fillText(`FPS: ${this.fps}`, 20, 150);
+            this.ctx.fillStyle = '#00ff88'; // Re-set color for debug HUD if needed
 
             if (this.warpTimer > 30000) this.ctx.fillStyle = '#ff4444';
             else this.ctx.fillStyle = '#00ff88';

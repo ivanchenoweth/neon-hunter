@@ -16,6 +16,7 @@ class Food {
         this.isCaptured = false;
         this.alpha = 1;
         this.baseRadius = this.radius;
+        this.targetedByBlocker = false;
 
         // Pre-render icon
         if (!this.iconCanvas) this.iconCanvas = document.createElement('canvas');
