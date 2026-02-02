@@ -60,11 +60,21 @@ class Game {
         this.foods = [];
         this.enemies = [];
         this.bullets = [];
+        this.loots = [];
+        this.particles = [];
+        this.floatingTexts = [];
+        this.spawnZones = [];
+        this.zoneTimer = 0;
         this.showDebugHUD = false; // Toggle with game.toggleDebug()
         this.beamSoundTimer = 0;
+
+        // Initial zones
+        this.generateSpawnZones();
         // Object Pools
-        this.bulletPool = new ObjectPool(() => new Bullet(this, 0, 0, 0, 0), 20);
-        this.enemyPool = new ObjectPool(() => new Enemy(this), 20);
+        this.bulletPool = new ObjectPool(() => new Bullet(this, 0, 0, 0, 0), 100);
+        this.enemyPool = new ObjectPool(() => new Enemy(this), 60);
+        this.enemyBulletPool = new ObjectPool(() => new EnemyBullet(this, 0, 0, 0), 50);
+        this.lootPool = new ObjectPool(() => new Loot(this, 0, 0, Loot.Types.COIN), 30);
         this.particlePool = new ObjectPool(() => new Particle(this, 0, 0, '#fff'), 50);
         this.foodPool = new ObjectPool(() => new Food(this), 50);
 
@@ -222,25 +232,21 @@ class Game {
             ctx.fillRect(fx, fy, 1.5, 1.5);
         });
 
-        // Draw spawn area on minimap (where enemies appear)
-        // Consistent with Enemy.js: marginW=400, marginH=400
-        const marginW = 400;
-        const marginH = 400;
-        const viewW = this.camera.width / this.camera.zoom;
-        const viewH = this.camera.height / this.camera.zoom;
+        // Draw dynamic spawn zones on minimap
+        this.spawnZones.forEach(zone => {
+            const sx = centerX + zone.x * scale;
+            const sy = centerY + zone.y * scale;
+            const sw = zone.w * scale;
+            const sh = zone.h * scale;
 
-        const spawnX = centerX + (this.camera.x - marginW) * scale;
-        const spawnY = centerY + (this.camera.y - marginH) * scale;
-        const spawnW = (viewW + 2 * marginW) * scale;
-        const spawnH = (viewH + 2 * marginH) * scale;
-
-        ctx.strokeStyle = 'rgba(255, 100, 100, 0.5)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(spawnX, spawnY, spawnW, spawnH);
-
-        // Fill spawn area with very light transparency as requested
-        ctx.fillStyle = 'rgba(255, 100, 100, 0.15)';
-        ctx.fillRect(spawnX, spawnY, spawnW, spawnH);
+            ctx.fillStyle = zone.color;
+            ctx.globalAlpha = 0.3;
+            ctx.fillRect(sx, sy, sw, sh);
+            ctx.strokeStyle = zone.color;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(sx, sy, sw, sh);
+        });
+        ctx.globalAlpha = 1.0;
 
         // Draw camera viewport on minimap
         const vx = centerX + this.camera.x * scale;
@@ -295,8 +301,13 @@ class Game {
         this.enemiesDestroyed = 0;
         this.enemies = [];
         this.bullets = [];
+        this.enemyBullets = [];
+        this.loots = [];
         this.foods = [];
         this.particles = [];
+        this.spawnZones = [];
+        this.generateSpawnZones();
+        this.zoneTimer = 0;
         this.enemyTimer = 0;
 
         // Reset Warp System
@@ -317,6 +328,7 @@ class Game {
     }
 
     takeDamage() {
+        if (this.player.shieldTimer > 0) return; // Protection!
         if (this.gameState !== this.states.PLAYING) return;
 
         this.lives--;
@@ -681,6 +693,8 @@ class Game {
 
         this.enemies.forEach(enemy => enemy.updateState(deltaTime));
         this.bullets.forEach(bullet => bullet.updateState(deltaTime));
+        this.enemyBullets.forEach(bullet => bullet.updateState(deltaTime));
+        this.loots.forEach(loot => loot.updateState(deltaTime));
         this.foods.forEach(food => food.updateState(deltaTime));
 
         // 3. Gestionar Ciclo de Vida (Eliminaciones/Pools)
@@ -688,8 +702,9 @@ class Game {
 
         // 4. Generación de Entidades (Spawner)
         this.spawnEntities(deltaTime);
+        this.updateSpawnZones(deltaTime);
 
-        // 5. Colisiones y Grid
+        // Update grid for collisionses y Grid
         this.updateGrid();
         this.processCollisions();
 
@@ -870,8 +885,9 @@ class Game {
         }
 
         if (shouldShoot && this.shotTimer <= 0) {
-            this.shoot(screenMouseX, screenMouseY);
-            this.shotTimer = this.shotInterval;
+            this.shoot();
+            const interval = this.player.rapidFireTimer > 0 ? this.shotInterval * 0.4 : this.shotInterval;
+            this.shotTimer = interval;
         }
     }
 
@@ -997,6 +1013,13 @@ class Game {
                 this.enemies[i].reset(this);
             }
         }
+        // Loot
+        for (let i = this.loots.length - 1; i >= 0; i--) {
+            if (this.loots[i].markedForDeletion) {
+                this.lootPool.release(this.loots[i]);
+                this.loots.splice(i, 1);
+            }
+        }
         // Foods
         for (let i = this.foods.length - 1; i >= 0; i--) {
             if (this.foods[i].markedForDeletion) {
@@ -1011,6 +1034,13 @@ class Game {
                 this.bullets.splice(i, 1);
             }
         }
+        // Enemy Bullets
+        for (let i = this.enemyBullets.length - 1; i >= 0; i--) {
+            if (this.enemyBullets[i].markedForDeletion) {
+                this.enemyBulletPool.release(this.enemyBullets[i]);
+                this.enemyBullets.splice(i, 1);
+            }
+        }
     }
 
     isOffScreen(entity) {
@@ -1019,8 +1049,8 @@ class Game {
         const viewW = this.width / this.camera.zoom;
         const viewH = this.height / this.camera.zoom;
 
-        // Reset margin MUST be consistent with spawn margin (400 in Enemy.js)
-        const resetMargin = 400;
+        // Reset margin MUST be consistent with spawn margin (max 1200 in Enemy.js)
+        const resetMargin = 1500;
 
         return (
             entity.x < this.camera.x - resetMargin ||
@@ -1033,12 +1063,95 @@ class Game {
     isVisible(entity) {
         const viewW = this.width / this.camera.zoom;
         const viewH = this.height / this.camera.zoom;
+        const buffer = 200;
         return (
-            entity.x >= this.camera.x &&
-            entity.x <= this.camera.x + viewW &&
-            entity.y >= this.camera.y &&
-            entity.y <= this.camera.y + viewH
+            entity.x >= this.camera.x - buffer &&
+            entity.x <= this.camera.x + viewW + buffer &&
+            entity.y >= this.camera.y - buffer &&
+            entity.y <= this.camera.y + viewH + buffer
         );
+    }
+
+    updateSpawnZones(deltaTime) {
+        this.zoneTimer += deltaTime;
+        if (this.zoneTimer > 8000 || this.spawnZones.length === 0) {
+            this.generateSpawnZones();
+            this.zoneTimer = 0;
+        }
+    }
+
+    generateSpawnZones() {
+        this.spawnZones = [];
+
+        // Define which enemies unlock at which warp
+        const unlockLevels = {
+            'basic': 1,
+            'charger': 2,
+            'striker': 3,
+            'drifter': 4,
+            'sniper': 5,
+            'spinner': 5,
+            'overlord': 5,
+            'swarth': 6,
+            'wraith': 6,
+            'spear': 7,
+            'mite': 7,
+            'stalker': 6
+        };
+
+        // Only generate zones for "Special" enemies that use them (not BASIC)
+        const types = Object.values(Enemy.Types).filter(type =>
+            type !== Enemy.Types.BASIC && (unlockLevels[type] || 1) <= this.warpLevel
+        );
+
+        if (types.length === 0) return;
+
+        // More types unlocked = more potential zones
+        const zoneCount = Math.min(types.length * 2, 8);
+
+        const colors = {
+            'basic': '#ff4444',
+            'charger': '#00d4ff',
+            'striker': '#ffff00',
+            'drifter': '#ff00ff',
+            'overlord': '#ff8800',
+            'sniper': '#00ff44',
+            'spinner': '#ff0055',
+            'stalker': '#00ffff',
+            'swarth': '#aaff00',
+            'wraith': '#ffffff',
+            'spear': '#ffaa00',
+            'mite': '#ff00aa'
+        };
+
+        for (let i = 0; i < zoneCount; i++) {
+            let zone;
+            let attempts = 0;
+            const type = types[Math.floor(Math.random() * types.length)];
+
+            while (attempts < 20) {
+                const w = 300 + Math.random() * 400;
+                const h = 300 + Math.random() * 400;
+                const x = (Math.random() - 0.5) * (this.worldWidth - w);
+                const y = (Math.random() - 0.5) * (this.worldHeight - h);
+
+                zone = { x, y, w, h, type, color: colors[type] || '#ffffff' };
+
+                // Check overlap
+                const overlaps = this.spawnZones.some(z => {
+                    return !(zone.x + zone.w < z.x ||
+                        zone.x > z.x + z.w ||
+                        zone.y + zone.h < z.y ||
+                        zone.y > z.y + z.h);
+                });
+
+                if (!overlaps) {
+                    this.spawnZones.push(zone);
+                    break;
+                }
+                attempts++;
+            }
+        }
     }
 
     spawnEntities(deltaTime) {
@@ -1052,8 +1165,21 @@ class Game {
             if (this.enemiesSpawnedInLevel < this.killQuota) {
                 // Limit the total Number of enemies that can exist in a level
                 // so the player can actually clear the screen as they progress.
-                this.enemies.push(this.enemyPool.get(this));
+                const e = this.enemyPool.get(this);
+                this.enemies.push(e);
                 this.enemiesSpawnedInLevel++;
+
+                // Group spawning for Swarth
+                if (e.type === Enemy.Types.SWARTH) {
+                    for (let i = 0; i < 5; i++) {
+                        const se = this.enemyPool.get(this);
+                        se.type = Enemy.Types.SWARTH;
+                        se.x = e.x + (Math.random() - 0.5) * 40;
+                        se.y = e.y + (Math.random() - 0.5) * 40;
+                        this.enemies.push(se);
+                        this.enemiesSpawnedInLevel++;
+                    }
+                }
                 this.enemyTimer = 0;
             }
         }
@@ -1068,32 +1194,44 @@ class Game {
         this.foods.forEach(food => {
             if (!food.isCaptured) this.grid.insert(food);
         });
+        this.loots.forEach(loot => {
+            if (!loot.isCaptured) this.grid.insert(loot);
+        });
         this.bullets.forEach(bullet => this.grid.insert(bullet));
+        this.enemyBullets.forEach(bullet => this.grid.insert(bullet));
         this.particles.forEach(p => this.grid.insert(p));
     }
 
     processCollisions() {
         // Bullet collisions
         this.bullets.forEach(bullet => {
-            const potentialEnemies = this.grid.retrieve(bullet, 50);
-            potentialEnemies.forEach(enemy => {
-                if (enemy instanceof Enemy && !enemy.markedForDeletion && !bullet.markedForDeletion) {
+            const potentialTargets = this.grid.retrieve(bullet, 50);
+            potentialTargets.forEach(target => {
+                if (bullet.markedForDeletion) return;
+
+                if (target instanceof Enemy && !target.markedForDeletion) {
                     // Only damage if enemy is within camera view
-                    if (this.isVisible(enemy)) {
-                        const dx = bullet.x - enemy.x;
-                        const dy = bullet.y - enemy.y;
+                    if (this.isVisible(target)) {
+                        const dx = bullet.x - target.x;
+                        const dy = bullet.y - target.y;
                         const dist = Math.sqrt(dx * dx + dy * dy);
-                        if (dist < enemy.size) {
-                            enemy.markedForDeletion = true;
+                        if (dist < target.size) {
+                            target.takeDamage(1); // Use takeDamage for consistent kill logic
                             bullet.markedForDeletion = true;
-                            this.score += 10;
-                            this.enemiesDestroyed++;
-                            this.warpLevelKillCount++;
-                            if (this.warpLevelKillCount >= this.killQuota && this.enemies.length <= 1 && this.warpMessageTimer <= 0) {
-                                this.nextLevel();
-                            }
-                            this.updateScore();
-                            this.createExplosion(enemy.x, enemy.y, enemy.color);
+                        }
+                    }
+                }
+                // Destructible projectiles (Stars)
+                else if (target instanceof EnemyBullet && !target.markedForDeletion && target.type === EnemyBullet.Types.STAR) {
+                    const dx = bullet.x - target.x;
+                    const dy = bullet.y - target.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < target.radius + 10) {
+                        target.markedForDeletion = true;
+                        bullet.markedForDeletion = true;
+                        // Small impact sparks
+                        for (let i = 0; i < 5; i++) {
+                            this.particles.push(this.particlePool.get(this, target.x, target.y, target.color));
                         }
                     }
                 }
@@ -1133,6 +1271,55 @@ class Game {
                     for (let i = 0; i < 5; i++) {
                         this.particles.push(this.particlePool.get(this, food.x, food.y, food.color));
                     }
+                }
+            }
+        });
+
+        // Enemy bullet collisions with Player
+        this.enemyBullets.forEach(bullet => {
+            if (!bullet.markedForDeletion) {
+                const dx = bullet.x - this.player.x;
+                const dy = bullet.y - this.player.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const isInvincible = this.player.collisionEffectTimer > 0 || this.player.shieldTimer > 0;
+                if (!isInvincible && dist < this.player.radius + bullet.radius) {
+                    bullet.markedForDeletion = true;
+                    this.takeDamage();
+                    this.player.triggerCollisionEffect();
+                }
+            }
+        });
+
+        // Player-Loot collisions
+        const nearbyLoot = this.grid.retrieve(this.player, this.player.radius + 50);
+        nearbyLoot.forEach(loot => {
+            if (loot instanceof Loot && !loot.isCaptured) {
+                const dx = this.player.x - loot.x;
+                const dy = this.player.y - loot.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < this.player.radius + loot.radius) {
+                    loot.isCaptured = true;
+                    if (loot.type === Loot.Types.HEART) {
+                        this.lives++;
+                        this.sound.playExtraLife();
+                        this.addFloatingText("VIDA +1", this.player.x, this.player.y, '#ff4444');
+                    } else if (loot.type === Loot.Types.SHIELD) {
+                        this.player.shieldTimer = 10000;
+                        this.addFloatingText("ESCUDO!", this.player.x, this.player.y, '#00d4ff');
+                    } else if (loot.type === Loot.Types.RAPID) {
+                        this.player.rapidFireTimer = 8000;
+                        this.addFloatingText("TURBO!", this.player.x, this.player.y, '#ff8800');
+                    } else if (loot.type === Loot.Types.TRIPLE) {
+                        this.player.tripleShotTimer = 8000;
+                        this.addFloatingText("TRI-DISPARO!", this.player.x, this.player.y, '#ff00ff');
+                    } else if (loot.type === Loot.Types.BOMB) {
+                        this.useBomb();
+                        this.addFloatingText("MEGA BOMBA!", this.player.x, this.player.y, '#ffffff');
+                    } else {
+                        this.score += 50;
+                        this.coins += 5;
+                    }
+                    this.updateScore();
                 }
             }
         });
@@ -1229,6 +1416,12 @@ class Game {
             } else if (ent instanceof Bullet) {
                 ent.draw(ctx);
                 ent.draw(bCtx); // Draw to bloom
+            } else if (ent instanceof EnemyBullet) {
+                ent.draw(ctx);
+                ent.draw(bCtx);
+            } else if (ent instanceof Loot) {
+                ent.draw(ctx);
+                ent.draw(bCtx);
             }
         });
 
@@ -1265,6 +1458,7 @@ class Game {
 
         // 3. Draw UI and HUD (Static on screen, should NOT glow)
         this.drawMinimap(this.ctx);
+        this.drawFloatingTexts(this.ctx);
 
         // Draw Main HUD (Visual)
         this.ctx.font = 'bold 20px "Outfit", sans-serif';
@@ -1278,7 +1472,15 @@ class Game {
         this.ctx.fillText(`Coins: ${this.coins}`, 20, hudYOffset + 30);
 
         this.ctx.fillStyle = '#ff4444';
-        this.ctx.fillText(`Lives: ${'❤️'.repeat(this.lives)}`, 20, hudYOffset + 60);
+        const fullGroups = Math.floor(this.lives / 10);
+        const remainder = this.lives % 10;
+        let livesText = '';
+        if (fullGroups > 0) {
+            livesText = `❤️x10`.repeat(fullGroups) + ' ' + '❤️'.repeat(remainder);
+        } else {
+            livesText = '❤️'.repeat(this.lives);
+        }
+        this.ctx.fillText(`Lives: ${livesText}`, 20, hudYOffset + 60);
 
         this.ctx.fillStyle = '#00ff88';
         this.ctx.fillText(`Warp ${this.warpLevel} Process: ${this.warpLevelKillCount} / ${this.killQuota}`, 20, hudYOffset + 90);
@@ -1483,16 +1685,84 @@ class Game {
         requestAnimationFrame(this.loop);
     }
 
-    shoot(mouseX, mouseY) {
+    shoot() {
         if (this.gameState !== this.states.PLAYING) return;
-        // Convert screen coordinates to world coordinates for arrow direction, accounting for zoom
-        const worldMouseX = (mouseX / this.camera.zoom) + this.camera.x;
-        const worldMouseY = (mouseY / this.camera.zoom) + this.camera.y;
-        this.player.setFireDirection(worldMouseX, worldMouseY);
+
+        const dx = this.player.fireDirection.x;
+        const dy = this.player.fireDirection.y;
+        const ang = Math.atan2(dy, dx);
+
+        const spawnBullet = (angleOffset = 0) => {
+            const finalAng = ang + angleOffset;
+            const targetX = this.player.x + Math.cos(finalAng) * 500;
+            const targetY = this.player.y + Math.sin(finalAng) * 500;
+            const b = this.bulletPool.get(this, this.player.x, this.player.y, targetX, targetY);
+            this.bullets.push(b);
+        };
+
+        if (this.player.tripleShotTimer > 0) {
+            spawnBullet(0);
+            spawnBullet(0.25); // Slightly wider spread for better feel
+            spawnBullet(-0.25);
+        } else {
+            spawnBullet(0);
+        }
+
         // Trigger arrow blink effect
         this.player.triggerArrowBlink();
-        // But bullets use screen coordinates since player is centered on screen
-        this.bullets.push(this.bulletPool.get(this, this.player.x, this.player.y, mouseX, mouseY));
         this.sound.playShoot();
     }
+
+    useBomb() {
+        // Clear all visible enemies and their bullets
+        this.enemies.forEach(enemy => {
+            if (this.isVisible(enemy)) {
+                enemy.takeDamage(100); // Massive damage to clear
+            }
+        });
+        this.enemyBullets.forEach(bullet => {
+            if (this.isVisible(bullet)) {
+                bullet.markedForDeletion = true;
+            }
+        });
+        // Big flash effect particles
+        for (let i = 0; i < 50; i++) {
+            const p = this.particlePool.get(this, this.player.x, this.player.y, '#ffffff');
+            p.speedX *= 3;
+            p.speedY *= 3;
+            this.particles.push(p);
+        }
+    }
+
+    addFloatingText(text, x, y, color) {
+        this.floatingTexts.push({
+            text, x, y, color,
+            timer: 1500, // 1.5 seconds
+            maxTimer: 1500
+        });
+    }
+
+    drawFloatingTexts(ctx) {
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.font = 'bold 24px "Outfit", sans-serif';
+
+        for (let i = this.floatingTexts.length - 1; i >= 0; i--) {
+            const ft = this.floatingTexts[i];
+            const t = ft.timer / ft.maxTimer; // 1.0 -> 0.0
+
+            // Screen position calculation
+            const screenX = (ft.x - this.camera.x) * this.camera.zoom;
+            const screenY = (ft.y - this.camera.y) * this.camera.zoom - (1 - t) * 100; // Float up
+
+            ctx.globalAlpha = t;
+            ctx.fillStyle = ft.color;
+            ctx.fillText(ft.text, screenX, screenY);
+
+            ft.timer -= 16; // Assuming ~60fps for simple logic
+            if (ft.timer <= 0) this.floatingTexts.splice(i, 1);
+        }
+        ctx.restore();
+    }
+
 }

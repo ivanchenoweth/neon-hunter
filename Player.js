@@ -22,7 +22,10 @@ class Player {
         this.beamChargeTime = 0;
         this.maxBeamChargeTime = 1500; // 1.5 seconds to max charge
         this.beamLength = 0;
-        this.maxBeamLength = 2000; // Maximum distance of the laser (increased to reach beyond spawn area)
+        this.maxBeamLength = 2000; // Maximum distance of the laser
+        this.shieldTimer = 0; // Temporary invulnerability
+        this.rapidFireTimer = 0;
+        this.tripleShotTimer = 0;
     }
 
     /**
@@ -59,9 +62,23 @@ class Player {
                 this.collisionAlpha = 1.0;
             }
         } else {
-            // No collision effect active, maintain base speed
             this.speed = this.game.baseSpeed || 110;
             this.collisionAlpha = 1.0;
+        }
+
+        if (this.shieldTimer > 0) {
+            this.shieldTimer -= deltaTime;
+            if (this.shieldTimer < 0) this.shieldTimer = 0;
+        }
+
+        if (this.rapidFireTimer > 0) {
+            this.rapidFireTimer -= deltaTime;
+            if (this.rapidFireTimer < 0) this.rapidFireTimer = 0;
+        }
+
+        if (this.tripleShotTimer > 0) {
+            this.tripleShotTimer -= deltaTime;
+            if (this.tripleShotTimer < 0) this.tripleShotTimer = 0;
         }
 
         let dx = 0;
@@ -254,6 +271,25 @@ class Player {
             ctx.lineTo(this.x + this.fireDirection.x * this.beamLength, this.y + this.fireDirection.y * this.beamLength);
             ctx.stroke();
 
+            ctx.restore();
+        }
+
+        // Draw Shield Ring
+        if (this.shieldTimer > 0) {
+            ctx.save();
+            ctx.strokeStyle = '#00d4ff';
+            ctx.lineWidth = 3;
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius + 10, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Outer glow
+            ctx.globalAlpha = 0.3;
+            ctx.lineWidth = 10;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius + 10, 0, Math.PI * 2);
+            ctx.stroke();
             ctx.restore();
         }
 

@@ -8,20 +8,33 @@ class Bullet {
         this.color = '#ffff00';
         this.markedForDeletion = false;
 
-        // Use the player's pre-calculated fire direction for perfect sync with arrow
-        this.dx = game.player.fireDirection.x;
-        this.dy = game.player.fireDirection.y;
+        const dx = targetX - x;
+        const dy = targetY - y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        this.dx = dx / dist;
+        this.dy = dy / dist;
 
         // Calculate angle for sprite rotation
         this.angle = Math.atan2(this.dy, this.dx);
 
-        if (!Bullet.spriteCanvas) {
-            Bullet.spriteCanvas = document.createElement('canvas');
-            Bullet.spriteCanvas.width = 20;
-            Bullet.spriteCanvas.height = 5;
-            const sCtx = Bullet.spriteCanvas.getContext('2d');
-            sCtx.fillStyle = this.color;
-            sCtx.fillRect(2.5, 1.5, 15, 2);
+        if (!Bullet.sprites) {
+            Bullet.sprites = {};
+
+            // Standard Yellow
+            const s1 = document.createElement('canvas');
+            s1.width = 20; s1.height = 5;
+            const ctx1 = s1.getContext('2d');
+            ctx1.fillStyle = '#ffff00';
+            ctx1.fillRect(2.5, 1.5, 15, 2);
+            Bullet.sprites['standard'] = s1;
+
+            // Rapid Orange
+            const s2 = document.createElement('canvas');
+            s2.width = 20; s2.height = 5;
+            const ctx2 = s2.getContext('2d');
+            ctx2.fillStyle = '#ffaa00';
+            ctx2.fillRect(2.5, 1.5, 15, 2);
+            Bullet.sprites['rapid'] = s2;
         }
     }
 
@@ -48,7 +61,10 @@ class Bullet {
         ctx.save();
         ctx.translate(this.x, this.y);
         ctx.rotate(this.angle);
-        ctx.drawImage(Bullet.spriteCanvas, -10, -2.5);
+
+        const sprite = Bullet.sprites[this.bulletType] || Bullet.sprites['standard'];
+        ctx.drawImage(sprite, -10, -2.5);
+
         ctx.restore();
     }
 
@@ -56,18 +72,22 @@ class Bullet {
         this.game = game;
         this.x = x;
         this.y = y;
-        this.speed = 600;
+        this.speed = (game.player.rapidFireTimer > 0) ? 900 : 600;
+        this.bulletType = (game.player.rapidFireTimer > 0) ? 'rapid' : 'standard';
         this.markedForDeletion = false;
 
-        const centerX = this.game.width / 2;
-        const centerY = this.game.height / 2;
-
-        const dx = targetX - centerX;
-        const dy = targetY - centerY;
+        const dx = targetX - x;
+        const dy = targetY - y;
         const distance = Math.sqrt(dx * dx + dy * dy);
 
-        this.dx = (dx / distance);
-        this.dy = (dy / distance);
-        this.angle = Math.atan2(dy, dx);
+        if (distance > 0) {
+            this.dx = (dx / distance);
+            this.dy = (dy / distance);
+        } else {
+            // Fallback for zero distance
+            this.dx = game.player.fireDirection.x;
+            this.dy = game.player.fireDirection.y;
+        }
+        this.angle = Math.atan2(this.dy, this.dx);
     }
 }
