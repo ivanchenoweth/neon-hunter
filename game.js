@@ -288,7 +288,7 @@ class Game {
         this.score = 0;
         this.coins = 0;
         this.lives = 5;
-        // Warp speed system: warp 1=110, warp 2=120, ..., warp 7=170 (max)
+        // Warp speed system: warp 1=110, warp 2=120, ..., warp 5=150 (max)
         this.baseSpeed = 110;  // Starting speed for warp 1
         this.player.speed = this.baseSpeed;  // Reset player speed on game start
         this.foodCollectedCount = 0;
@@ -1419,9 +1419,9 @@ class Game {
         this.player.resetSpawnAnimation(); // Trigger player transition animation
         this.sound.playExtraLife(); // Reuse for level up sound or create new
 
-        // Progressive speed by warp: warp 1=110, warp 2=120, ..., warp 7=170 (max)
-        // Formula: 100 + (warpLevel * 10), capped at 170
-        this.baseSpeed = Math.min(170, 100 + (this.warpLevel * 10));
+        // Progressive speed by warp: warp 1=110, warp 2=120, ..., warp 5=150 (max)
+        // Formula: 100 + (warpLevel * 10), capped at 150
+        this.baseSpeed = Math.min(150, 100 + (this.warpLevel * 10));
 
         // Reset player speed to the new base speed (unless in collision effect)
         if (this.player.collisionEffectTimer <= 0) {

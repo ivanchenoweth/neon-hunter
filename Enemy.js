@@ -2,9 +2,8 @@ class Enemy {
     constructor(game) {
         this.game = game;
         this.size = 25;
-        // Increase speed by 20% for each warp level (Warp 1 = 1x, Warp 2 = 1.2x)
-        const speedMultiplier = 1 + (this.game.warpLevel - 1) * 0.2;
-        const maxSpeed = 90 * speedMultiplier;
+        // Limit enemy speed to 120% of player speed, max 180
+        const maxSpeed = Math.min(180, this.game.baseSpeed * 1.2);
         this.baseSpeed = maxSpeed * (0.8 + Math.random() * 0.2);
         this.speed = this.baseSpeed;
         this.color = '#ff4444';
@@ -143,8 +142,8 @@ class Enemy {
         this.x = Math.max(-halfW, Math.min(halfW, this.x));
         this.y = Math.max(-halfH, Math.min(halfH, this.y));
         this.angle = 0;
-        const speedMultiplier = 1 + (this.game.warpLevel - 1) * 0.2;
-        const maxSpeed = 90 * speedMultiplier;
+        // Limit enemy speed to 120% of player speed, max 180
+        const maxSpeed = Math.min(180, this.game.baseSpeed * 1.2);
         this.baseSpeed = maxSpeed * (0.8 + Math.random() * 0.2);
         this.speed = this.baseSpeed;
         this._adjustSpawnIntoView();

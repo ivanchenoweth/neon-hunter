@@ -37,7 +37,7 @@ To avoid "Garbage Collection stutter" (pauses due to memory release), we impleme
 
 Enemies in Neon Hunter exhibit specific behaviors designed to challenge the player:
 
-- **Aggressive Chasing**: Enemies constantly calculate the vector towards the player and move at a random speed (between 180 and 250 units/sec) to intercept them.
+- **Aggressive Chasing**: Enemies constantly calculate the vector towards the player and move at a speed relative to the player's (up to 120% of the player's nominal speed, with a maximum of 180 units/sec) to intercept them.
 - **Social Separation**: They implement a separation algorithm. If they get too close to each other, they apply a "push" force to avoid overlapping, creating a "swarming" effect rather than stacking.
 - **Dynamic Spawning**:
     - They spawn at a safe distance from the player (between 600 and 1000 units).
@@ -154,5 +154,7 @@ The server handles `SIGINT` and `SIGTERM` signals and performs a graceful shutdo
 - To keep the server running in the background on Linux, consider `nohup node server.js &` or using `pm2`.
 
 ---
+
+game.toggleDebug()
 
 **Author:** Ivan R. Chenoweth
