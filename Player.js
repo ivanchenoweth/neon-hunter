@@ -7,7 +7,6 @@ class Player {
         this.speed = 110;
         this.color = '#00ff88';
         this.glow = '#00ff88';
-        this.trailTimer = 0;
         this.fireDirection = { x: 0, y: -1 }; // Direction pointer for firing
         this.arrowBlinkTimer = 0; // Timer for arrow blink effect when firing
 
@@ -24,8 +23,19 @@ class Player {
         this.beamLength = 0;
         this.maxBeamLength = 2000; // Maximum distance of the laser
         this.shieldTimer = 0; // Temporary invulnerability
-        this.rapidFireTimer = 0;
+        this.turboTimer = 0; // Speed + Fire rate boost
         this.tripleShotTimer = 0;
+
+        // Constant ribbon trail
+        this.trail = [];
+        this.maxTrailLength = 30;
+
+        // Dash / Teleport transition
+        this.isDashing = false;
+        this.dashTarget = { x: 0, y: 0 };
+        this.dashTimer = 0;
+        this.dashDuration = 0;
+        this.dashStartPos = { x: 0, y: 0 };
     }
 
     /**
@@ -34,6 +44,25 @@ class Player {
      * En un entorno multijugador, esto correría en el servidor.
      */
     updateState(deltaTime, input) {
+        if (this.isDashing) {
+            this.dashTimer += deltaTime;
+            const t = Math.min(1.0, this.dashTimer / this.dashDuration);
+
+            // Linear interpolation
+            this.x = this.dashStartPos.x + (this.dashTarget.x - this.dashStartPos.x) * t;
+            this.y = this.dashStartPos.y + (this.dashTarget.y - this.dashStartPos.y) * t;
+
+            if (t >= 1.0) {
+                this.isDashing = false;
+            }
+
+            // Return direction info for the trail even during dash
+            const dx = this.dashTarget.x - this.dashStartPos.x;
+            const dy = this.dashTarget.y - this.dashStartPos.y;
+            const mag = Math.sqrt(dx * dx + dy * dy);
+            return (mag > 0) ? { dx: dx / mag, dy: dy / mag } : { dx: 0, dy: 0 };
+        }
+
         // Update collision effect timer
         if (this.collisionEffectTimer > 0) {
             this.collisionEffectTimer -= deltaTime;
@@ -62,7 +91,9 @@ class Player {
                 this.collisionAlpha = 1.0;
             }
         } else {
-            this.speed = this.game.baseSpeed || 110;
+            // Base speed or Turbo speed
+            const base = this.game.baseSpeed || 110;
+            this.speed = (this.turboTimer > 0) ? base * 1.8 : base;
             this.collisionAlpha = 1.0;
         }
 
@@ -71,9 +102,9 @@ class Player {
             if (this.shieldTimer < 0) this.shieldTimer = 0;
         }
 
-        if (this.rapidFireTimer > 0) {
-            this.rapidFireTimer -= deltaTime;
-            if (this.rapidFireTimer < 0) this.rapidFireTimer = 0;
+        if (this.turboTimer > 0) {
+            this.turboTimer -= deltaTime;
+            if (this.turboTimer < 0) this.turboTimer = 0;
         }
 
         if (this.tripleShotTimer > 0) {
@@ -129,10 +160,14 @@ class Player {
 
         // Trail effect
         if (dx !== 0 || dy !== 0) {
-            this.trailTimer += deltaTime;
-            if (this.trailTimer > 50) {
-                this.game.particles.push(new Particle(this.game, this.x, this.y, this.color));
-                this.trailTimer = 0;
+            this.trail.unshift({ x: this.x, y: this.y });
+            if (this.trail.length > this.maxTrailLength) {
+                this.trail.pop();
+            }
+        } else {
+            // Decay trail when stopped
+            if (this.trail.length > 0) {
+                this.trail.pop();
             }
         }
     }
@@ -144,6 +179,27 @@ class Player {
     }
 
     draw(ctx) {
+        // Draw Trail first (behind player)
+        if (this.trail.length > 1) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.strokeStyle = this.color;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            for (let i = 0; i < this.trail.length - 1; i++) {
+                const alpha = (1 - i / this.trail.length) * 0.5 * this.collisionAlpha;
+                ctx.globalAlpha = alpha;
+                ctx.lineWidth = this.radius * 1.5 * (1 - i / this.trail.length);
+
+                ctx.beginPath();
+                ctx.moveTo(this.trail[i].x, this.trail[i].y);
+                ctx.lineTo(this.trail[i + 1].x, this.trail[i + 1].y);
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
         ctx.save();
 
         // Spawn Animation

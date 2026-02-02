@@ -3,7 +3,7 @@ class Loot {
         COIN: 'coin',
         HEART: 'heart',
         SHIELD: 'shield',
-        RAPID: 'rapid',
+        TURBO: 'turbo',
         TRIPLE: 'triple',
         BOMB: 'bomb'
     };
@@ -22,7 +22,7 @@ class Loot {
             'coin': '#ffff00',
             'heart': '#ff4444',
             'shield': '#00d4ff',
-            'rapid': '#ff8800',
+            'turbo': '#ff8800',
             'triple': '#ff00ff',
             'bomb': '#ffffff'
         };
@@ -56,8 +56,8 @@ class Loot {
                 ctx.closePath();
                 ctx.fill();
                 ctx.stroke();
-            } else if (type === Loot.Types.RAPID) {
-                // Square for rapid
+            } else if (type === Loot.Types.TURBO) {
+                // Square for turbo
                 ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
                 ctx.strokeRect(cx - r, cy - r, r * 2, r * 2);
             } else if (type === Loot.Types.TRIPLE) {
@@ -108,7 +108,7 @@ class Loot {
             case Loot.Types.SHIELD:
                 this.color = '#00d4ff';
                 break;
-            case Loot.Types.RAPID:
+            case Loot.Types.TURBO:
                 this.color = '#ff8800'; // Orange
                 break;
             case Loot.Types.TRIPLE:

@@ -814,27 +814,27 @@ class Game {
         // Base radius 60, up to 240 at max power
         const radius = 60 + progress * 180;
 
-        // Visual effect
+        // Visual effect (initial burst at target)
         this.createExplosion(x, y, '#ff00ff', 60);
         this.sound.playBeamExplosion();
-        // Removed camera shake as per user request
 
-        // Teleport player to the laser beam tip
-        this.player.x = x;
-        this.player.y = y;
+        // Calculate dash duration based on distance
+        const dx = x - this.player.x;
+        const dy = y - this.player.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
 
-        // Clamp player position within world boundaries after teleport
-        const halfWidth = this.worldWidth / 2;
-        const halfHeight = this.worldHeight / 2;
-        this.player.x = Math.max(-halfWidth + this.player.radius, Math.min(halfWidth - this.player.radius, this.player.x));
-        this.player.y = Math.max(-halfHeight + this.player.radius, Math.min(halfHeight - this.player.radius, this.player.y));
+        // High speed dash: 5000px/s
+        const dashSpeed = 5000;
+        const duration = (dist / dashSpeed) * 1000; // in ms
 
-        // Create a dash trail effect between old and new position
-        // Potential improvement: add particles along the path
-        this.createExplosion(x, y, '#ff00ff', 40);
+        // Set player dash state
+        this.player.isDashing = true;
+        this.player.dashStartPos = { x: this.player.x, y: this.player.y };
+        this.player.dashTarget = { x: x, y: y };
+        this.player.dashTimer = 0;
+        this.player.dashDuration = Math.max(50, duration); // At least 50ms for visual feedback
 
-
-        // Add a temporary ripple particle for the explosion range
+        // Add a temporary ripple particle for the explosion range at target
         for (let i = 0; i < 360; i += 20) {
             const rad = i * Math.PI / 180;
             const px = x + Math.cos(rad) * radius;
@@ -886,7 +886,7 @@ class Game {
 
         if (shouldShoot && this.shotTimer <= 0) {
             this.shoot();
-            const interval = this.player.rapidFireTimer > 0 ? this.shotInterval * 0.4 : this.shotInterval;
+            const interval = this.player.turboTimer > 0 ? this.shotInterval * 0.4 : this.shotInterval;
             this.shotTimer = interval;
         }
     }
@@ -1306,9 +1306,9 @@ class Game {
                     } else if (loot.type === Loot.Types.SHIELD) {
                         this.player.shieldTimer = 10000;
                         this.addFloatingText("ESCUDO!", this.player.x, this.player.y, '#00d4ff');
-                    } else if (loot.type === Loot.Types.RAPID) {
-                        this.player.rapidFireTimer = 8000;
-                        this.addFloatingText("TURBO!", this.player.x, this.player.y, '#ff8800');
+                    } else if (loot.type === Loot.Types.TURBO) {
+                        this.player.turboTimer = 8000;
+                        this.addFloatingText("MEGA TURBO!", this.player.x, this.player.y, '#ff8800');
                     } else if (loot.type === Loot.Types.TRIPLE) {
                         this.player.tripleShotTimer = 8000;
                         this.addFloatingText("TRI-DISPARO!", this.player.x, this.player.y, '#ff00ff');
@@ -1435,7 +1435,31 @@ class Game {
         });
 
         this.player.draw(ctx);
-        this.player.draw(bCtx);
+        if (this.player.spawnTimer <= 0) this.player.draw(bCtx);
+
+        // --- Speed Lines during Dash ---
+        if (this.player.isDashing) {
+            bCtx.save();
+            bCtx.strokeStyle = '#ff00ff';
+            bCtx.lineWidth = 2;
+            bCtx.globalAlpha = 0.6;
+            const dashDx = this.player.dashTarget.x - this.player.dashStartPos.x;
+            const dashDy = this.player.dashTarget.y - this.player.dashStartPos.y;
+            const dashAngle = Math.atan2(dashDy, dashDx);
+
+            for (let i = 0; i < 15; i++) {
+                const offsetX = (Math.random() - 0.5) * 60;
+                const offsetY = (Math.random() - 0.5) * 60;
+                const length = 40 + Math.random() * 60;
+
+                bCtx.beginPath();
+                bCtx.moveTo(this.player.x + offsetX, this.player.y + offsetY);
+                bCtx.lineTo(this.player.x + offsetX - Math.cos(dashAngle) * length,
+                    this.player.y + offsetY - Math.sin(dashAngle) * length);
+                bCtx.stroke();
+            }
+            bCtx.restore();
+        }
 
         ctx.restore();
         bCtx.restore();
@@ -1483,7 +1507,10 @@ class Game {
         this.ctx.fillText(`Lives: ${livesText}`, 20, hudYOffset + 60);
 
         this.ctx.fillStyle = '#00ff88';
+
+        this.ctx.fillStyle = '#00ff88';
         this.ctx.fillText(`Warp ${this.warpLevel} Process: ${this.warpLevelKillCount} / ${this.killQuota}`, 20, hudYOffset + 90);
+        this.ctx.fillText(`FPS: ${this.fps}`, 20, hudYOffset + 120);
 
         // Conditional Debug HUD
         if (this.showDebugHUD) {
@@ -1493,7 +1520,6 @@ class Game {
             const ss = (seconds % 60).toString().padStart(2, '0');
 
             this.ctx.fillStyle = '#00ff88';
-            this.ctx.fillText(`FPS: ${this.fps}`, 20, 150);
 
             if (this.warpTimer > 30000) this.ctx.fillStyle = '#ff4444';
             else this.ctx.fillStyle = '#00ff88';
@@ -1674,6 +1700,18 @@ class Game {
             this.fps = this.frameCount;
             this.frameCount = 0;
             this.fpsTimer = 0;
+        }
+
+        // Camera Warp/Teleport Transition
+        if (this.warpMessageTimer > 0) {
+            const t = (this.warpMessageDuration - this.warpMessageTimer) / this.warpMessageDuration;
+            // Smooth pulse: zoom goes from 1.0 -> 1.25 -> 1.0
+            this.camera.zoom = 1.0 + Math.sin(t * Math.PI) * 0.25;
+        } else if (this.player.isDashing) {
+            // Slight zoom in during dash travel
+            this.camera.zoom = 1.15;
+        } else {
+            this.camera.zoom = 1.0;
         }
 
         // Limit deltaTime to avoid huge jumps if the tab was inactive

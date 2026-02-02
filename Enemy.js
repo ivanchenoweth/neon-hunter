@@ -278,7 +278,7 @@ class Enemy {
 
             if (isAdvanced && Math.random() < 0.25) { // 25% chance for powerup on advanced
                 const pRoll = Math.random();
-                if (pRoll < 0.33) lootType = Loot.Types.RAPID;
+                if (pRoll < 0.33) lootType = Loot.Types.TURBO;
                 else if (pRoll < 0.66) lootType = Loot.Types.TRIPLE;
                 else lootType = Loot.Types.BOMB;
             } else {

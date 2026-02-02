@@ -28,13 +28,13 @@ class Bullet {
             ctx1.fillRect(2.5, 1.5, 15, 2);
             Bullet.sprites['standard'] = s1;
 
-            // Rapid Orange
+            // Turbo Orange
             const s2 = document.createElement('canvas');
             s2.width = 20; s2.height = 5;
             const ctx2 = s2.getContext('2d');
             ctx2.fillStyle = '#ffaa00';
             ctx2.fillRect(2.5, 1.5, 15, 2);
-            Bullet.sprites['rapid'] = s2;
+            Bullet.sprites['turbo'] = s2;
         }
     }
 
@@ -72,8 +72,8 @@ class Bullet {
         this.game = game;
         this.x = x;
         this.y = y;
-        this.speed = (game.player.rapidFireTimer > 0) ? 900 : 600;
-        this.bulletType = (game.player.rapidFireTimer > 0) ? 'rapid' : 'standard';
+        this.speed = (game.player.turboTimer > 0) ? 900 : 600;
+        this.bulletType = (game.player.turboTimer > 0) ? 'turbo' : 'standard';
         this.markedForDeletion = false;
 
         const dx = targetX - x;
