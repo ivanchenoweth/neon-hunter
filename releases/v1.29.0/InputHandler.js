@@ -1,0 +1,138 @@
+class InputHandler {
+    constructor() {
+        this.keys = {
+            w: false,
+            a: false,
+            s: false,
+            d: false,
+            i: false,
+            j: false,
+            l: false,
+            k: false,
+            p: false,
+            space: false,
+            enter: false,
+            arrowleft: false,
+            arrowdown: false,
+            arrowup: false,
+            arrowright: false
+        };
+
+        this.mouse = { x: 0, y: 0 };
+        this.mouseDown = false;
+        this.rightMouseDown = false;
+        this.virtualBeamButton = false; // For touch mode extra button
+
+        // Binding methods
+        this._onKeyDown = this.handleKeyDown.bind(this);
+        this._onKeyUp = this.handleKeyUp.bind(this);
+        this._onMouseMove = (e) => {
+            this.mouse.x = e.clientX;
+            this.mouse.y = e.clientY;
+        };
+        this._onMouseDown = (e) => {
+            if (e.button === 0) this.mouseDown = true;
+            if (e.button === 2) this.rightMouseDown = true;
+        };
+        this._onMouseUp = (e) => {
+            if (e.button === 0) this.mouseDown = false;
+            if (e.button === 2) this.rightMouseDown = false;
+        };
+        this._onContextMenu = (e) => e.preventDefault();
+
+        // Virtual joysticks (multitouch)
+        this.joystickLeft = { x: 0, y: 0, active: false };
+        this.joystickRight = { x: 0, y: 0, active: false };
+
+        // Setup listeners based on current mode
+        this.setupListeners();
+
+        // Re-setup when mode changes
+        window.addEventListener('inputModeChanged', () => {
+            console.log('Input mode changed, re-setting listeners');
+            this.setupListeners();
+        });
+
+        this._startJoystickPoll();
+    }
+
+    setupListeners() {
+        // Remove existing to avoid duplicates
+        window.removeEventListener('keydown', this._onKeyDown);
+        window.removeEventListener('keyup', this._onKeyUp);
+        window.removeEventListener('mousemove', this._onMouseMove);
+        window.removeEventListener('mousedown', this._onMouseDown);
+        window.removeEventListener('mouseup', this._onMouseUp);
+        window.removeEventListener('contextmenu', this._onContextMenu);
+
+        const mode = window.inputMode || 'keyboard';
+
+        if (mode === 'keyboard' || mode === 'keyboardFire') {
+            window.addEventListener('keydown', this._onKeyDown);
+            window.addEventListener('keyup', this._onKeyUp);
+
+            if (mode === 'keyboard') {
+                window.addEventListener('mousemove', this._onMouseMove);
+                window.addEventListener('mousedown', this._onMouseDown);
+                window.addEventListener('mouseup', this._onMouseUp);
+                window.addEventListener('contextmenu', this._onContextMenu);
+            }
+        }
+    }
+
+    handleKeyDown(e) {
+        const key = e.key.toLowerCase();
+        if (this.keys.hasOwnProperty(key)) {
+            this.keys[key] = true;
+        }
+        if (e.code === 'Space') {
+            this.keys.space = true;
+        }
+        if (e.code === 'Enter') {
+            this.keys.enter = true;
+        }
+    }
+
+    handleKeyUp(e) {
+        const key = e.key.toLowerCase();
+        if (this.keys.hasOwnProperty(key)) {
+            this.keys[key] = false;
+        }
+        if (e.code === 'Space') {
+            this.keys.space = false;
+        }
+        if (e.code === 'Enter') {
+            this.keys.enter = false;
+        }
+    }
+
+    _startJoystickPoll() {
+        const poll = () => {
+            const vc = window.virtualControls;
+            if (vc) {
+                this.joystickLeft.x = vc.left.x;
+                this.joystickLeft.y = vc.left.y;
+                this.joystickLeft.active = vc.left.active;
+
+                this.joystickRight.x = vc.right.x;
+                this.joystickRight.y = vc.right.y;
+                this.joystickRight.active = vc.right.active;
+                // Map right joystick to aiming/shooting only if input mode is touch
+                const deadzone = 0.15;
+                const modeNow = window.inputMode || 'keyboard';
+                if (modeNow === 'touch') {
+                    if (this.joystickRight.active && (Math.abs(this.joystickRight.x) > deadzone || Math.abs(this.joystickRight.y) > deadzone)) {
+                        const aimDist = 300; // distance from center in px for aiming target
+                        this.mouse.x = (window.innerWidth / 2) + this.joystickRight.x * aimDist;
+                        this.mouse.y = (window.innerHeight / 2) + this.joystickRight.y * aimDist;
+                        this.mouseDown = true;
+                    } else {
+                        this.mouseDown = false;
+                    }
+                }
+            }
+            requestAnimationFrame(poll);
+        };
+        requestAnimationFrame(poll);
+    }
+}
