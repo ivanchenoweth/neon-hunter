@@ -164,4 +164,28 @@ class SoundController {
         osc.start();
         osc.stop(this.ctx.currentTime + 0.5);
     }
+
+    playWarp() {
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+
+        const now = this.ctx.currentTime;
+        const duration = 0.5;
+
+        // Upward sweep with a sci-fi feel
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(100, now);
+        osc.frequency.exponentialRampToValueAtTime(1200, now + duration);
+
+        gain.gain.setValueAtTime(this.masterVolume * 0.6, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + duration);
+
+        osc.start();
+        osc.stop(now + duration);
+    }
 }

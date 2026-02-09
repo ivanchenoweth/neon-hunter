@@ -5,6 +5,7 @@ class Food {
     }
 
     reset() {
+        this.id = 'food_' + Math.random().toString(36).substr(2, 9);
         this.x = (Math.random() - 0.5) * this.game.worldWidth;
         this.y = (Math.random() - 0.5) * this.game.worldHeight;
         this.radius = 4 + Math.random() * 4; // Random size
@@ -23,6 +24,7 @@ class Food {
     }
 
     updateIcon() {
+        this.baseRadius = this.radius; // Sync baseRadius for correct visual scaling
         const size = (this.radius + 5) * 2;
         this.iconCanvas.width = size;
         this.iconCanvas.height = size;

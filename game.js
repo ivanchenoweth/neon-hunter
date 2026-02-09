@@ -55,11 +55,22 @@ class Game {
         this.sound = new SoundController();
         this.camera = new Camera(this.width, this.height, window.zoomLevel || 1);
         this.player = new Player(this);
-        this.background = new Background(this);
+        this.backgroundSeed = Math.floor(Math.random() * 1000000);
+        this.background = new Background(this, this.backgroundSeed);
 
         this.foods = [];
         this.enemies = [];
         this.bullets = [];
+
+        // Multiplayer state
+        this.isHost = false;
+        this.remotePlayers = new Map();
+        this.networkTimer = 0;
+        this.networkInterval = 33; // ~30Hz update rate for player movement
+        this.enemySyncTimer = 0;
+        this.enemySyncInterval = 100; // ~10Hz update rate for enemies
+        this.lastSentState = null; // Forces first network update to send camera info
+
         this.showDebugHUD = false; // Toggle with game.toggleDebug()
         this.beamSoundTimer = 0;
         // Object Pools
@@ -108,22 +119,28 @@ class Game {
             // Start Screen Buttons
             zoomOut: { x: 0, y: 0, w: 50, h: 40 },
             zoomIn: { x: 0, y: 0, w: 50, h: 40 },
+            modeSingle: { x: 0, y: 0, w: 220, h: 50 },
+            modeMulti: { x: 0, y: 0, w: 220, h: 50 },
             modeTouch: { x: 0, y: 0, w: 220, h: 50 },
             modeKeyboard: { x: 0, y: 0, w: 220, h: 50 },
-            modeKeyboardFire: { x: 0, y: 0, w: 220, h: 50 }
+            modeKeyboardFire: { x: 0, y: 0, w: 220, h: 50 },
+            back: { x: 0, y: 0, w: 100, h: 40 }
         };
 
         // Canvas Interaction
         this.canvas.addEventListener('pointerup', (e) => this.handleCanvasClick(e));
 
         // Menu Navigation State
-        this.menuSelection = 2; // Default to 'Touch' (index 2) on start
+        this.menuStage = 'MODE'; // 'MODE' or 'INPUT'
+        this.selectedGameMode = null; // 'SINGLE' or 'MULTI'
+        this.menuSelection = 0; // Default selection
         this.menuCooldown = 0;
         this.sessionActive = false;
 
         // Warp System
         // Warp System
         this.warpLevel = 1;
+        this.player.id = 'HOST'; // Ensure local player has an ID for targeting logic
         this.warpLevelKillCount = 0;
         this.killQuota = 100;
         this.enemiesSpawnedInLevel = 0;
@@ -132,10 +149,283 @@ class Game {
         this.warpTimer = 0; // ms passed in current warp
 
         this.lastTime = 0;
+        this.spawnArea = null; // { x, y, w, h } - used for multiplayer
         this.loop = this.loop.bind(this);
 
         // Center camera on player immediately
         this.camera.follow(this.player, 0);
+
+        // No longer init automatically
+        // this.initMultiplayer();
+    }
+
+    initMultiplayer() {
+        if (typeof io === 'undefined') {
+            return;
+        }
+
+        this.socket = io();
+
+        this.socket.on('isHost', () => {
+            this.isHost = true;
+            console.log('--- ERES EL HOST ---');
+        });
+
+        this.socket.on('hostAssigned', (hostId) => {
+            this.isHost = (this.socket.id === hostId);
+            console.log(this.isHost ? 'Eres el HOST' : 'Eres un CLIENTE');
+
+            if (!this.isHost) {
+                this.socket.emit('requestWorldState');
+            } else if (this.sessionActive && !this.spawnArea) {
+                // No longer randomizing spawn area here to keep it dynamic around players
+                this.spawnArea = null;
+            }
+        });
+
+        this.socket.on('currentPlayers', (players) => {
+            Object.keys(players).forEach((id) => {
+                if (id !== this.socket.id) {
+                    this.addRemotePlayer(id, players[id]);
+                } else {
+                    const me = players[id];
+                    this.player.index = me.index;
+                    this.player.x = me.x;
+                    this.player.y = me.y;
+                    this.player.targetX = me.x;
+                    this.player.targetY = me.y;
+                    this.camera.follow(this.player, 0); // Jump camera to spawn
+                    console.log('--- MI INDICE ES:', this.player.index, 'EN POS:', me.x, me.y);
+                }
+            });
+        });
+
+        this.socket.on('newPlayer', (playerInfo) => {
+            this.addRemotePlayer(playerInfo.id, playerInfo);
+            // If I am host, I should send the world state to the new player
+            if (this.isHost) {
+                this.socket.emit('worldState', {
+                    to: playerInfo.id,
+                    state: this.getWorldState()
+                });
+            }
+        });
+
+        this.socket.on('requestWorldState', (requesterId) => {
+            if (this.isHost) {
+                this.socket.emit('worldState', {
+                    to: requesterId,
+                    state: this.getWorldState()
+                });
+            }
+        });
+
+        this.socket.on('worldState', (state) => {
+            console.log('--- RECIBIENDO ESTADO DEL MUNDO ---');
+            this.backgroundSeed = state.backgroundSeed;
+            this.background = new Background(this, this.backgroundSeed);
+            this.warpLevel = state.warpLevel;
+            this.killQuota = state.killQuota;
+            this.enemiesDestroyed = state.enemiesDestroyed;
+            this.warpLevelKillCount = state.warpLevelKillCount;
+            this.spawnArea = state.spawnArea; // Sync spawn area from host
+
+            // Sync foods
+            this.foods = [];
+            state.foods.forEach(fData => {
+                const f = this.foodPool.get(this);
+                f.id = fData.id;
+                f.x = fData.x;
+                f.y = fData.y;
+                f.radius = fData.radius;
+                f.color = fData.color;
+                f.updateIcon();
+                this.foods.push(f);
+            });
+
+            // Sync enemies
+            this.enemies = [];
+            state.enemies.forEach(eData => {
+                const e = this.enemyPool.get(this);
+                e.id = eData.id;
+                e.x = eData.x;
+                e.y = eData.y;
+                e.speed = eData.speed;
+                this.enemies.push(e);
+            });
+        });
+
+        this.socket.on('foodCollected', (foodId) => {
+            const food = this.foods.find(f => f.id === foodId);
+            if (food) {
+                food.isCaptured = true;
+            }
+        });
+
+        this.socket.on('playerMoved', (playerInfo) => {
+            const remotePlayer = this.remotePlayers.get(playerInfo.id);
+            if (remotePlayer) {
+                // Store target position for interpolation
+                remotePlayer.targetX = playerInfo.x;
+                remotePlayer.targetY = playerInfo.y;
+                remotePlayer.fireDirection = playerInfo.fireDirection;
+
+                // Store camera info for minimap
+                remotePlayer.cameraX = playerInfo.cameraX;
+                remotePlayer.cameraY = playerInfo.cameraY;
+                remotePlayer.viewW = playerInfo.viewW;
+                remotePlayer.viewH = playerInfo.viewH;
+            }
+        });
+
+        this.socket.on('playerFired', (shootData) => {
+            const remotePlayer = this.remotePlayers.get(shootData.id);
+            if (remotePlayer) {
+                const b = this.bulletPool.get(this, remotePlayer.x, remotePlayer.y, shootData.mouseX, shootData.mouseY, remotePlayer);
+                this.bullets.push(b);
+                this.sound.playShoot();
+            }
+        });
+
+        this.socket.on('playerDisconnected', (id) => {
+            this.remotePlayers.delete(id);
+        });
+
+        this.socket.on('statsUpdated', (stats) => {
+            const player = this.remotePlayers.get(stats.id);
+            if (player) {
+                player.score = stats.score;
+                player.kills = stats.kills;
+            }
+        });
+
+        this.socket.on('enemySpawned', (enemyData) => {
+            if (!this.isHost) {
+                const enemy = this.enemyPool.get(this);
+                enemy.id = enemyData.id;
+                enemy.x = enemyData.x;
+                enemy.y = enemyData.y;
+                enemy.speed = enemyData.speed;
+                this.enemies.push(enemy);
+            }
+        });
+
+        this.socket.on('spawnAreaUpdated', (data) => {
+            this.spawnArea = data;
+        });
+
+        this.socket.on('syncEnemies', (enemiesSyncData) => {
+            if (!this.isHost) {
+                // IDs of enemies present in the sync packet
+                const hostEnemyIds = new Set(enemiesSyncData.map(d => d.id));
+
+                // 1. Remove local enemies that the host no longer has
+                this.enemies = this.enemies.filter(e => {
+                    if (hostEnemyIds.has(e.id)) return true;
+                    // If not in host list, return to pool and remove
+                    e.markedForDeletion = false;
+                    this.enemyPool.release(e);
+                    return false;
+                });
+
+                // 2. Update existing or create missing
+                enemiesSyncData.forEach(data => {
+                    let enemy = this.enemies.find(e => e.id === data.id);
+                    if (!enemy) {
+                        enemy = this.enemyPool.get(this);
+                        enemy.id = data.id;
+                        // For new enemies, set position immediately to avoid jumping from pool reset pos
+                        enemy.x = data.x;
+                        enemy.y = data.y;
+                        enemy.angle = data.angle;
+                        this.enemies.push(enemy);
+                    }
+                    enemy.setTargetState(data);
+                });
+            }
+        });
+
+        this.socket.on('foodSpawned', (fData) => {
+            if (!this.isHost) {
+                const f = this.foodPool.get(this);
+                f.id = fData.id;
+                f.x = fData.x;
+                f.y = fData.y;
+                f.radius = fData.radius;
+                f.color = fData.color;
+                f.updateIcon();
+                this.foods.push(f);
+            }
+        });
+
+        this.socket.on('gamePaused', () => {
+            this.gameState = this.states.PAUSED;
+        });
+
+        this.socket.on('gameResumed', () => {
+            this.gameState = this.states.PLAYING;
+        });
+
+        this.socket.on('enemyDestroyed', (enemyId) => {
+            const enemy = this.enemies.find(e => e.id === enemyId);
+            if (enemy) {
+                enemy.markedForDeletion = true;
+                this.createExplosion(enemy.x, enemy.y, enemy.color);
+
+                // If I am Host and a client destroyed an enemy, I must also count it for level progress
+                if (this.isHost) {
+                    this.score += 10;
+                    this.enemiesDestroyed++;
+                    this.warpLevelKillCount++;
+                    this.updateScore();
+
+                    if (this.warpLevelKillCount >= this.killQuota && this.enemies.length <= 1 && this.warpMessageTimer <= 0) {
+                        this.nextLevel();
+                    }
+                }
+            }
+        });
+
+        // Force an immediate network sync to broadcast camera info upon joining
+        this.updateNetwork(0);
+    }
+
+    getWorldState() {
+        return {
+            backgroundSeed: this.backgroundSeed,
+            warpLevel: this.warpLevel,
+            killQuota: this.killQuota,
+            enemiesDestroyed: this.enemiesDestroyed,
+            warpLevelKillCount: this.warpLevelKillCount,
+            spawnArea: this.spawnArea,
+            foods: this.foods.filter(f => !f.isCaptured).map(f => ({
+                id: f.id,
+                x: f.x,
+                y: f.y,
+                radius: f.radius,
+                color: f.color
+            })),
+            enemies: this.enemies.map(e => ({
+                id: e.id,
+                x: e.x,
+                y: e.y,
+                speed: e.speed
+            }))
+        };
+    }
+
+    addRemotePlayer(id, playerInfo) {
+        const remotePlayer = new Player(this);
+        remotePlayer.index = playerInfo.index || 0;
+        remotePlayer.x = playerInfo.x;
+        remotePlayer.y = playerInfo.y;
+        // Important: Init interpolation target to avoid NaN/invisible player
+        remotePlayer.targetX = playerInfo.x;
+        remotePlayer.targetY = playerInfo.y;
+        remotePlayer.color = playerInfo.color;
+        remotePlayer.fireDirection = playerInfo.fireDirection;
+        remotePlayer.isHost = playerInfo.isHost;
+        this.remotePlayers.set(id, remotePlayer);
     }
 
     handleResize() {
@@ -177,9 +467,12 @@ class Game {
     }
 
     updateScore() {
-        // En un futuro multijugador, aquí se podría notificar al servidor
-        // o procesar lógica de subida de nivel.
-        // El puntaje ahora se dibuja directamente en el canvas en el método draw().
+        if (this.socket) {
+            this.socket.emit('updateStats', {
+                score: this.score,
+                kills: this.enemiesDestroyed
+            });
+        }
     }
 
     drawMinimap(ctx) {
@@ -223,24 +516,37 @@ class Game {
         });
 
         // Draw spawn area on minimap (where enemies appear)
-        // Consistent with Enemy.js: marginW=400, marginH=400
-        const marginW = 400;
-        const marginH = 400;
-        const viewW = this.camera.width / this.camera.zoom;
-        const viewH = this.camera.height / this.camera.zoom;
+        if (this.spawnArea) {
+            const sx = centerX + this.spawnArea.x * scale;
+            const sy = centerY + this.spawnArea.y * scale;
+            const sw = this.spawnArea.w * scale;
+            const sh = this.spawnArea.h * scale;
 
-        const spawnX = centerX + (this.camera.x - marginW) * scale;
-        const spawnY = centerY + (this.camera.y - marginH) * scale;
-        const spawnW = (viewW + 2 * marginW) * scale;
-        const spawnH = (viewH + 2 * marginH) * scale;
+            ctx.strokeStyle = 'rgba(255, 100, 100, 0.5)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(sx, sy, sw, sh);
+            ctx.fillStyle = 'rgba(255, 100, 100, 0.15)';
+            ctx.fillRect(sx, sy, sw, sh);
+        } else {
+            // Consistent with Enemy.js: marginW=400, marginH=400
+            const marginW = 400;
+            const marginH = 400;
+            const viewW = this.camera.width / this.camera.zoom;
+            const viewH = this.camera.height / this.camera.zoom;
 
-        ctx.strokeStyle = 'rgba(255, 100, 100, 0.5)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(spawnX, spawnY, spawnW, spawnH);
+            const spawnX = centerX + (this.camera.x - marginW) * scale;
+            const spawnY = centerY + (this.camera.y - marginH) * scale;
+            const spawnW = (viewW + 2 * marginW) * scale;
+            const spawnH = (viewH + 2 * marginH) * scale;
 
-        // Fill spawn area with very light transparency as requested
-        ctx.fillStyle = 'rgba(255, 100, 100, 0.15)';
-        ctx.fillRect(spawnX, spawnY, spawnW, spawnH);
+            ctx.strokeStyle = 'rgba(255, 100, 100, 0.5)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(spawnX, spawnY, spawnW, spawnH);
+
+            // Fill spawn area with very light transparency as requested
+            ctx.fillStyle = 'rgba(255, 100, 100, 0.15)';
+            ctx.fillRect(spawnX, spawnY, spawnW, spawnH);
+        }
 
         // Draw camera viewport on minimap
         const vx = centerX + this.camera.x * scale;
@@ -251,11 +557,36 @@ class Game {
         ctx.lineWidth = 1;
         ctx.strokeRect(vx, vy, vw, vh);
 
+        // Draw remote players' viewports on minimap
+        this.remotePlayers.forEach(p => {
+            if (p.viewW > 0) {
+                const rvx = centerX + p.cameraX * scale;
+                const rvy = centerY + p.cameraY * scale;
+                const rvw = p.viewW * scale;
+                const rvh = p.viewH * scale;
+
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)'; // More visible alpha
+                ctx.lineWidth = 2; // Thicker line
+                ctx.setLineDash([4, 6]); // Larger dashes
+                ctx.strokeRect(rvx, rvy, rvw, rvh);
+                ctx.setLineDash([]);
+                ctx.lineWidth = 1; // Reset width
+            }
+        });
+
         // Draw player on minimap
         ctx.fillStyle = '#fff';
         const px = centerX + this.player.x * scale;
         const py = centerY + this.player.y * scale;
         ctx.fillRect(px - 1.5, py - 1.5, 3, 3);
+
+        // Draw remote players on minimap
+        this.remotePlayers.forEach(player => {
+            ctx.fillStyle = player.color;
+            const rpx = centerX + player.x * scale;
+            const rpy = centerY + player.y * scale;
+            ctx.fillRect(rpx - 1.5, rpy - 1.5, 3, 3);
+        });
 
         // Draw enemies on minimap
         ctx.fillStyle = '#ff4444';
@@ -283,6 +614,12 @@ class Game {
     }
 
     startGame() {
+        if (this.selectedGameMode === 'MULTI' && this.isHost) {
+            this.randomizeSpawnArea();
+        } else if (this.selectedGameMode === 'SINGLE') {
+            this.spawnArea = null;
+        }
+
         this.sessionActive = true;
         this.gameState = this.states.PLAYING;
         this.score = 0;
@@ -300,13 +637,24 @@ class Game {
         this.enemyTimer = 0;
 
         // Reset Warp System
-        // Reset Warp System
         this.warpLevel = 1;
         this.warpLevelKillCount = 0;
         this.enemiesSpawnedInLevel = 0;
         this.warpMessageTimer = 3000; // Show "WARP 1" on start
         this.warpTimer = 0;
         this.player.resetSpawnAnimation();
+
+        // Initial food only for host/single
+        if (this.isHost || !this.socket) {
+            for (let i = 0; i < 50; i++) {
+                const f = this.foodPool.get(this);
+                f.id = 'food_' + Math.random().toString(36).substr(2, 9);
+                this.foods.push(f);
+            }
+        } else {
+            // Clients request state
+            this.socket.emit('requestWorldState');
+        }
 
         // Hide overlays if present
         if (this.startScreen && this.startScreen.classList) this.startScreen.classList.add('hidden');
@@ -375,36 +723,69 @@ class Game {
             }
 
             // Mode Selection
-            const modes = [
-                { bounds: this.btnBounds.modeTouch, mode: 'touch', color: '#00ff88' },
-                { bounds: this.btnBounds.modeKeyboard, mode: 'keyboard', color: '#00d4ff' },
-                { bounds: this.btnBounds.modeKeyboardFire, mode: 'keyboardFire', color: '#ff00ff' }
-            ];
+            if (this.menuStage === 'MODE') {
+                const modes = [
+                    { bounds: this.btnBounds.modeSingle, mode: 'SINGLE', color: '#00ff88' },
+                    { bounds: this.btnBounds.modeMulti, mode: 'MULTI', color: '#00d4ff' }
+                ];
 
-            for (let m of modes) {
-                const b = m.bounds;
-                if (mouseX >= b.x && mouseX <= b.x + b.w && mouseY >= b.y && mouseY <= b.y + b.h) {
-                    // 1. Enter Fullscreen IMMEDIATELY to capture user gesture
-                    const el = document.documentElement;
-                    const rfs = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
-                    if (rfs) {
-                        rfs.call(el).catch(err => console.log('Fullscreen denied:', err));
+                for (let m of modes) {
+                    const b = m.bounds;
+                    if (mouseX >= b.x && mouseX <= b.x + b.w && mouseY >= b.y && mouseY <= b.y + b.h) {
+                        this.triggerExplosion(b.x + b.w / 2, b.y + b.h / 2, m.color, 30);
+                        this.selectedGameMode = m.mode;
+                        if (m.mode === 'MULTI') {
+                            this.initMultiplayer();
+                        } else {
+                            this.isHost = true; // Single player is always host of their own world
+                        }
+                        this.menuStage = 'INPUT';
+                        this.menuSelection = 0; // Reset selection for next stage
+                        this.sound.playCollect();
+                        return;
                     }
-
-                    // 2. Trigger Explosion
-                    this.triggerExplosion(b.x + b.w / 2, b.y + b.h / 2, m.color, 30);
-
-                    // 3. Set Mode
-                    window.inputMode = m.mode;
-                    window.dispatchEvent(new Event('inputModeChanged'));
-
-                    // 4. Start Game or Resume
-                    if (this.sessionActive) {
-                        this.gameState = this.states.PLAYING;
-                    } else {
-                        this.startGame();
-                    }
+                }
+            } else if (this.menuStage === 'INPUT') {
+                // Back Button
+                const bBack = this.btnBounds.back;
+                if (mouseX >= bBack.x && mouseX <= bBack.x + bBack.w && mouseY >= bBack.y && mouseY <= bBack.y + bBack.h) {
+                    this.menuStage = 'MODE';
+                    this.menuSelection = 0;
+                    this.sound.playDamage(); // Subtle feedback for "back"
                     return;
+                }
+
+                const modes = [
+                    { bounds: this.btnBounds.modeTouch, mode: 'touch', color: '#00ff88' },
+                    { bounds: this.btnBounds.modeKeyboard, mode: 'keyboard', color: '#00d4ff' },
+                    { bounds: this.btnBounds.modeKeyboardFire, mode: 'keyboardFire', color: '#ff00ff' }
+                ];
+
+                for (let m of modes) {
+                    const b = m.bounds;
+                    if (mouseX >= b.x && mouseX <= b.x + b.w && mouseY >= b.y && mouseY <= b.y + b.h) {
+                        // 1. Enter Fullscreen IMMEDIATELY to capture user gesture
+                        const el = document.documentElement;
+                        const rfs = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
+                        if (rfs) {
+                            rfs.call(el).catch(err => console.log('Fullscreen denied:', err));
+                        }
+
+                        // 2. Trigger Explosion
+                        this.triggerExplosion(b.x + b.w / 2, b.y + b.h / 2, m.color, 30);
+
+                        // 3. Set Mode
+                        window.inputMode = m.mode;
+                        window.dispatchEvent(new Event('inputModeChanged'));
+
+                        // 4. Start Game or Resume
+                        if (this.sessionActive) {
+                            this.gameState = this.states.PLAYING;
+                        } else {
+                            this.startGame();
+                        }
+                        return;
+                    }
                 }
             }
         } else if (this.gameState === this.states.GAME_OVER) {
@@ -466,7 +847,14 @@ class Game {
         ctx.shadowBlur = 0;
         ctx.font = `bold ${versionSize}px "Outfit", sans-serif`;
         ctx.fillStyle = '#00ff88';
-        ctx.fillText('v1.6.1-crimson-hawk (feat/31-respawn-outside-area • 2026-01-28 21:28)', cx, cy - 150 * scale);
+        ctx.fillText('v1.6.1-crimson-hawk', cx, cy - 165 * scale);
+
+        if (this.socket && this.player.index) {
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `bold ${24 * scale}px "Outfit", sans-serif`;
+            let hostTag = this.isHost ? ' (SERVER)' : '';
+            ctx.fillText(`PLAYER ${this.player.index}${hostTag}`, cx, cy - 145 * scale);
+        }
 
         // Zoom Out Button
         const bZoomOut = this.btnBounds.zoomOut;
@@ -492,29 +880,53 @@ class Game {
         // Instruction
         ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
         ctx.font = `${instructionSize}px "Outfit", sans-serif`;
-        ctx.fillText('Choose how you want to play:', cx, cy - 40 * scale);
 
-        // Mode Buttons
         const btnW = 220 * scale;
         const btnH = 50 * scale;
 
-        const bTouch = this.btnBounds.modeTouch;
-        bTouch.w = btnW; bTouch.h = btnH;
-        bTouch.x = cx - btnW / 2;
-        bTouch.y = cy;
-        this.drawButton(ctx, bTouch, 'Touch Joysticks', '#00ff88', this.menuSelection === 2, buttonTextSize);
+        if (this.menuStage === 'MODE') {
+            ctx.fillText('Choose game mode:', cx, cy - 40 * scale);
 
-        const bKeyboard = this.btnBounds.modeKeyboard;
-        bKeyboard.w = btnW; bKeyboard.h = btnH;
-        bKeyboard.x = cx - btnW / 2;
-        bKeyboard.y = cy + spacing;
-        this.drawButton(ctx, bKeyboard, 'WASD + Mouse', '#00d4ff', this.menuSelection === 3, buttonTextSize);
+            const bSingle = this.btnBounds.modeSingle;
+            bSingle.w = btnW; bSingle.h = btnH;
+            bSingle.x = cx - btnW / 2;
+            bSingle.y = cy;
+            this.drawButton(ctx, bSingle, 'SINGLE PLAYER', '#00ff88', this.menuSelection === 2, buttonTextSize);
 
-        const bKeyboardFire = this.btnBounds.modeKeyboardFire;
-        bKeyboardFire.w = btnW; bKeyboardFire.h = btnH;
-        bKeyboardFire.x = cx - btnW / 2;
-        bKeyboardFire.y = cy + 2 * spacing;
-        this.drawButton(ctx, bKeyboardFire, 'WASD + IJLK', '#ff00ff', this.menuSelection === 4, buttonTextSize);
+            const bMulti = this.btnBounds.modeMulti;
+            bMulti.w = btnW; bMulti.h = btnH;
+            bMulti.x = cx - btnW / 2;
+            bMulti.y = cy + spacing;
+            this.drawButton(ctx, bMulti, 'MULTIPLE PLAYER', '#00d4ff', this.menuSelection === 3, buttonTextSize);
+        } else if (this.menuStage === 'INPUT') {
+            ctx.fillText('Choose control method:', cx, cy - 40 * scale);
+
+            const bTouch = this.btnBounds.modeTouch;
+            bTouch.w = btnW; bTouch.h = btnH;
+            bTouch.x = cx - btnW / 2;
+            bTouch.y = cy;
+            this.drawButton(ctx, bTouch, 'Touch Joysticks', '#00ff88', this.menuSelection === 2, buttonTextSize);
+
+            const bKeyboard = this.btnBounds.modeKeyboard;
+            bKeyboard.w = btnW; bKeyboard.h = btnH;
+            bKeyboard.x = cx - btnW / 2;
+            bKeyboard.y = cy + spacing;
+            this.drawButton(ctx, bKeyboard, 'WASD + Mouse', '#00d4ff', this.menuSelection === 3, buttonTextSize);
+
+            const bKeyboardFire = this.btnBounds.modeKeyboardFire;
+            bKeyboardFire.w = btnW; bKeyboardFire.h = btnH;
+            bKeyboardFire.x = cx - btnW / 2;
+            bKeyboardFire.y = cy + 2 * spacing;
+            this.drawButton(ctx, bKeyboardFire, 'WASD + IJLK', '#ff00ff', this.menuSelection === 4, buttonTextSize);
+
+            // Back Button
+            const bBack = this.btnBounds.back;
+            bBack.w = 100 * scale;
+            bBack.h = 40 * scale;
+            bBack.x = 20 * scale;
+            bBack.y = this.height - 60 * scale;
+            this.drawButton(ctx, bBack, 'BACK', '#ff4444', false, 14 * scale);
+        }
 
         ctx.restore();
     }
@@ -653,6 +1065,17 @@ class Game {
         // 2. Actualizar Entidades (Lógica autoritativa)
         const movementInfo = this.player.updateState(deltaTime, this.input);
 
+        // Interpolate remote players on Host to have accurate positions for enemies
+        if (this.isHost) {
+            const lerpFactor = 0.15; // Smooth interpolation
+            this.remotePlayers.forEach(rp => {
+                if (rp.targetX !== undefined && rp.targetY !== undefined) {
+                    rp.x += (rp.targetX - rp.x) * lerpFactor;
+                    rp.y += (rp.targetY - rp.y) * lerpFactor;
+                }
+            });
+        }
+
         // 2.1 Speed Escalation Logic (Warp Timer > 30s)
         // We do this BEFORE updating enemies so they use the new speed this frame.
         if (this.warpTimer > 30000) {
@@ -696,7 +1119,58 @@ class Game {
         // 6. Energy Rod Logic
         this.updateEnergyRod(deltaTime);
 
+        // 7. Network Sync (Throttled)
+        this.updateNetwork(deltaTime);
+
         return movementInfo;
+    }
+
+    updateNetwork(deltaTime) {
+        if (!this.socket) return;
+
+        // Player Move Sync
+        this.networkTimer += deltaTime;
+        if (this.networkTimer >= this.networkInterval) {
+            const currentState = {
+                x: Math.round(this.player.x),
+                y: Math.round(this.player.y),
+                fireDirection: {
+                    x: Number(this.player.fireDirection.x.toFixed(2)),
+                    y: Number(this.player.fireDirection.y.toFixed(2))
+                },
+                cameraX: Math.round(this.camera.x),
+                cameraY: Math.round(this.camera.y),
+                viewW: Math.round(this.camera.width / this.camera.zoom),
+                viewH: Math.round(this.camera.height / this.camera.zoom)
+            };
+
+            const dist = !this.lastSentState ? 999 : Math.sqrt(Math.pow(currentState.x - this.lastSentState.x, 2) + Math.pow(currentState.y - this.lastSentState.y, 2));
+            const dirChanged = !this.lastSentState || (currentState.fireDirection.x !== this.lastSentState.fireDirection.x || currentState.fireDirection.y !== this.lastSentState.fireDirection.y);
+            const camChanged = !this.lastSentState || (currentState.cameraX !== this.lastSentState.cameraX || currentState.cameraY !== this.lastSentState.cameraY || currentState.viewW !== this.lastSentState.viewW || currentState.viewH !== this.lastSentState.viewH);
+
+            if (dist > 1 || dirChanged || camChanged) {
+                this.socket.emit('playerMove', currentState);
+                this.lastSentState = currentState;
+            }
+            this.networkTimer = 0;
+        }
+
+        // Enemy Sync (Host Only)
+        if (this.isHost) {
+            this.enemySyncTimer += deltaTime;
+            if (this.enemySyncTimer >= this.enemySyncInterval) {
+                const enemiesData = this.enemies.map(e => ({
+                    id: e.id,
+                    x: Math.round(e.x),
+                    y: Math.round(e.y),
+                    angle: Number(e.angle.toFixed(2)),
+                    speed: Math.round(e.speed),
+                    markedForDeletion: e.markedForDeletion
+                }));
+                this.socket.emit('syncEnemies', enemiesData);
+                this.enemySyncTimer = 0;
+            }
+        }
     }
 
     updateAiming() {
@@ -799,27 +1273,27 @@ class Game {
         // Base radius 60, up to 240 at max power
         const radius = 60 + progress * 180;
 
-        // Visual effect
+        // Visual effect (initial burst at target)
         this.createExplosion(x, y, '#ff00ff', 60);
         this.sound.playBeamExplosion();
-        // Removed camera shake as per user request
 
-        // Teleport player to the laser beam tip
-        this.player.x = x;
-        this.player.y = y;
+        // Calculate dash duration based on distance
+        const dx = x - this.player.x;
+        const dy = y - this.player.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
 
-        // Clamp player position within world boundaries after teleport
-        const halfWidth = this.worldWidth / 2;
-        const halfHeight = this.worldHeight / 2;
-        this.player.x = Math.max(-halfWidth + this.player.radius, Math.min(halfWidth - this.player.radius, this.player.x));
-        this.player.y = Math.max(-halfHeight + this.player.radius, Math.min(halfHeight - this.player.radius, this.player.y));
+        // High speed dash: 5000px/s
+        const dashSpeed = 5000;
+        const duration = (dist / dashSpeed) * 1000; // in ms
 
-        // Create a dash trail effect between old and new position
-        // Potential improvement: add particles along the path
-        this.createExplosion(x, y, '#ff00ff', 40);
+        // Set player dash state
+        this.player.isDashing = true;
+        this.player.dashStartPos = { x: this.player.x, y: this.player.y };
+        this.player.dashTarget = { x: x, y: y };
+        this.player.dashTimer = 0;
+        this.player.dashDuration = Math.max(50, duration); // At least 50ms for visual feedback
 
-
-        // Add a temporary ripple particle for the explosion range
+        // Add a temporary ripple particle for the explosion range at target
         for (let i = 0; i < 360; i += 20) {
             const rad = i * Math.PI / 180;
             const px = x + Math.cos(rad) * radius;
@@ -834,6 +1308,22 @@ class Game {
      */
     updateVisuals(deltaTime, movementInfo) {
         this.player.updateVisuals(deltaTime, movementInfo);
+
+        // Update Remote Players with interpolation
+        this.remotePlayers.forEach(player => {
+            // Smoothly move towards target position (simple lerp)
+            player.x += (player.targetX - player.x) * 0.2;
+            player.y += (player.targetY - player.y) * 0.2;
+            player.updateVisuals(deltaTime, { dx: player.targetX - player.x, dy: player.targetY - player.y });
+        });
+
+        // Update Enemies with interpolation (Client only)
+        if (!this.isHost) {
+            this.enemies.forEach(enemy => {
+                if (enemy.updateInterpolation) enemy.updateInterpolation(deltaTime);
+            });
+        }
+
         this.camera.follow(this.player, deltaTime);
 
         this.foods.forEach(food => {
@@ -893,20 +1383,26 @@ class Game {
         const isTouchMode = window.inputMode === 'touch';
 
         if (this.gameState === this.states.INITIAL) {
-            // Indices: 0:ZoomOut, 1:ZoomIn, 2:Touch, 3:WASD+Mouse, 4:WASD+IJLK
+            // Stage MODE: 0:ZoomOut, 1:ZoomIn, 2:Single, 3:Multi
+            // Stage INPUT: 0:ZoomOut, 1:ZoomIn, 2:Touch, 3:WASD+Mouse, 4:WASD+IJLK, 5:Back
             if (this.menuCooldown === 0 && !isTouchMode) {
+                const maxSelection = this.menuStage === 'MODE' ? 3 : 5;
+
                 if (up) {
-                    if (this.menuSelection > 1) this.menuSelection--; // Move up list
-                    else if (this.menuSelection <= 1) { /* Stay in row 0 */ }
-                    // Logic fix: 2->1? But 2 is centered. 2->0/1 logic:
-                    // If at 2, up goes to 0 or 1? Let's say 0 default or keep previous column? 
-                    // Simple stack: 0,1 are top row. 2 is below.
-                    if (this.menuSelection === 2) this.menuSelection = 0;
+                    if (this.menuSelection > 1) {
+                        this.menuSelection--;
+                        // Special case: if we were at 2 and go up, we go to 0 or 1.
+                        if (this.menuSelection === 1 && this.menuStage === 'MODE') {
+                            // Stay at 1 or handle row logic
+                        }
+                    } else if (this.menuSelection === 2) {
+                        this.menuSelection = 0;
+                    }
                     this.menuCooldown = 200;
                     this.sound.playCollect();
                 } else if (down) {
-                    if (this.menuSelection < 4) {
-                        if (this.menuSelection < 2) this.menuSelection = 2; // From Zoom to Touch
+                    if (this.menuSelection < maxSelection) {
+                        if (this.menuSelection < 2) this.menuSelection = 2; // From Zoom to Modes/Inputs
                         else this.menuSelection++;
                         this.menuCooldown = 200;
                         this.sound.playCollect();
@@ -919,7 +1415,7 @@ class Game {
             }
 
             if (select && this.menuCooldown === 0) {
-                this.menuCooldown = 300; // Longer cooldown after action
+                this.menuCooldown = 300;
                 if (this.menuSelection === 0) {
                     // Zoom Out
                     if (window.zoomLevel > 0.5) {
@@ -936,12 +1432,32 @@ class Game {
                         const b = this.btnBounds.zoomIn;
                         this.triggerExplosion(b.x + b.w / 2, b.y + b.h / 2, '#ff8500', 10);
                     }
-                } else {
-                    // Modes
+                } else if (this.menuStage === 'MODE') {
+                    if (this.menuSelection === 2) { // Single Player
+                        this.selectedGameMode = 'SINGLE';
+                        this.isHost = true;
+                        this.menuStage = 'INPUT';
+                        this.menuSelection = 2; // Default to first input option
+                        this.sound.playCollect();
+                    } else if (this.menuSelection === 3) { // Multi Player
+                        this.selectedGameMode = 'MULTI';
+                        this.initMultiplayer();
+                        this.menuStage = 'INPUT';
+                        this.menuSelection = 2; // Default to first input option
+                        this.sound.playCollect();
+                    }
+                } else if (this.menuStage === 'INPUT') {
                     let mode = '', bounds = null, color = '';
                     if (this.menuSelection === 2) { mode = 'touch'; bounds = this.btnBounds.modeTouch; color = '#00ff88'; }
                     if (this.menuSelection === 3) { mode = 'keyboard'; bounds = this.btnBounds.modeKeyboard; color = '#00d4ff'; }
                     if (this.menuSelection === 4) { mode = 'keyboardFire'; bounds = this.btnBounds.modeKeyboardFire; color = '#ff00ff'; }
+
+                    if (this.menuSelection === 5) { // BACK
+                        this.menuStage = 'MODE';
+                        this.menuSelection = 2;
+                        this.sound.playDamage();
+                        return;
+                    }
 
                     if (mode) {
                         this.triggerExplosion(bounds.x + bounds.w / 2, bounds.y + bounds.h / 2, color, 30);
@@ -957,7 +1473,6 @@ class Game {
                         } else {
                             this.startGame();
                         }
-                        // Anti-bounce: consume input
                         this.input.keys.enter = false;
                     }
                 }
@@ -1013,21 +1528,61 @@ class Game {
         }
     }
 
+    resetSpawnArea() {
+        this.spawnArea = null;
+    }
+
+    randomizeSpawnArea() {
+        const areaSize = 800;
+        const halfW = this.worldWidth / 2;
+        const halfH = this.worldHeight / 2;
+
+        // Ensure the area is within world bounds (offset by half world size to map -2000...2000 to 0...4000 then back)
+        const x = (Math.random() * (this.worldWidth - areaSize)) - halfW;
+        const y = (Math.random() * (this.worldHeight - areaSize)) - halfH;
+
+        this.spawnArea = { x, y, w: areaSize, h: areaSize };
+
+        if (this.isHost && this.socket) {
+            this.socket.emit('spawnAreaUpdated', this.spawnArea);
+        }
+    }
+
     isOffScreen(entity) {
-        // MUST use zoomed viewport dimensions. 
-        // Viewport width in world space is this.width / this.camera.zoom
-        const viewW = this.width / this.camera.zoom;
-        const viewH = this.height / this.camera.zoom;
+        // Multi-player OffScreen detection:
+        // An entity is off-screen ONLY if it is off-screen for EVERY player.
+        // We use a large reset margin (2000px) to allow enemies to travel from 
+        // a fixed spawnArea to a distant player without being reset prematurely.
 
-        // Reset margin MUST be consistent with spawn margin (400 in Enemy.js)
-        const resetMargin = 400;
+        const resetMargin = 2000;
 
-        return (
+        // 1. Check for local player
+        const localZoom = this.zoomLevel || this.camera.zoom || 1.0;
+        const localViewW = this.width / localZoom;
+        const localViewH = this.height / localZoom;
+        const isOffLocal = (
             entity.x < this.camera.x - resetMargin ||
-            entity.x > this.camera.x + viewW + resetMargin ||
+            entity.x > this.camera.x + localViewW + resetMargin ||
             entity.y < this.camera.y - resetMargin ||
-            entity.y > this.camera.y + viewH + resetMargin
+            entity.y > this.camera.y + localViewH + resetMargin
         );
+
+        if (!isOffLocal) return false;
+
+        // 2. Check for remote players
+        for (const rp of this.remotePlayers.values()) {
+            if (rp.viewW > 0) {
+                const isOffRemote = (
+                    entity.x < rp.cameraX - resetMargin ||
+                    entity.x > rp.cameraX + rp.viewW + resetMargin ||
+                    entity.y < rp.cameraY - resetMargin ||
+                    entity.y > rp.cameraY + rp.viewH + resetMargin
+                );
+                if (!isOffRemote) return false;
+            }
+        }
+
+        return true;
     }
 
     isVisible(entity) {
@@ -1042,23 +1597,42 @@ class Game {
     }
 
     spawnEntities(deltaTime) {
-        this.enemyTimer += deltaTime;
+        if (this.socket && !this.isHost) return; // Only host spawns in multiplayer
 
-        // Keep spawning until the Warp Quota is met.
-        // We want to maintain a healthy population of enemies (max 60) as long as we haven't reached the goal.
+        this.enemyTimer += deltaTime;
         const spawnInterval = this.enemies.length === 0 ? this.enemyInterval / 2 : this.enemyInterval;
 
-        if (this.enemyTimer > spawnInterval && this.enemies.length < 60) {
+        if (this.enemyTimer > spawnInterval && this.enemies.length < 100) {
             if (this.enemiesSpawnedInLevel < this.killQuota) {
-                // Limit the total Number of enemies that can exist in a level
-                // so the player can actually clear the screen as they progress.
-                this.enemies.push(this.enemyPool.get(this));
+                const enemy = this.enemyPool.get(this);
+                this.enemies.push(enemy);
                 this.enemiesSpawnedInLevel++;
                 this.enemyTimer = 0;
+
+                // Sync spawn to clients
+                if (this.isHost && this.socket) {
+                    this.socket.emit('enemySpawned', {
+                        id: enemy.id,
+                        x: Math.round(enemy.x),
+                        y: Math.round(enemy.y),
+                        speed: Math.round(enemy.speed)
+                    });
+                }
             }
         }
-        if (this.foods.length < 50) {
-            this.foods.push(this.foodPool.get(this));
+        if (this.foods.length < 50 && (this.isHost || !this.socket)) {
+            const f = this.foodPool.get(this);
+            this.foods.push(f);
+
+            if (this.isHost && this.socket) {
+                this.socket.emit('foodSpawned', {
+                    id: f.id,
+                    x: Math.round(f.x),
+                    y: Math.round(f.y),
+                    radius: f.radius,
+                    color: f.color
+                });
+            }
         }
     }
 
@@ -1086,6 +1660,12 @@ class Game {
                         if (dist < enemy.size) {
                             enemy.markedForDeletion = true;
                             bullet.markedForDeletion = true;
+
+                            // Notify server about the kill
+                            if (this.socket) {
+                                this.socket.emit('enemyKilled', enemy.id);
+                            }
+
                             this.score += 10;
                             this.enemiesDestroyed++;
                             this.warpLevelKillCount++;
@@ -1116,6 +1696,11 @@ class Game {
                     const progress = (this.foodCollectedCount - 1) % 5;
                     this.sound.playCollect(progress);
 
+                    // Notify others
+                    if (this.socket) {
+                        this.socket.emit('foodCollected', food.id);
+                    }
+
                     // Extra life every 5 collected foods (no limit)
                     if (this.foodCollectedCount % 5 === 0) {
                         this.lives++;
@@ -1139,13 +1724,16 @@ class Game {
     }
 
     update(deltaTime) {
-        // Check for pause toggle
-        if (this.input.keys.p && this.gameState === this.states.PLAYING) {
-            this.gameState = this.states.PAUSED;
-            this.input.keys.p = false; // Consume the key press
-        } else if (this.input.keys.p && this.gameState === this.states.PAUSED) {
-            this.gameState = this.states.PLAYING;
-            this.input.keys.p = false; // Consume the key press
+        // Check for pause toggle - Host Only
+        if (this.input.keys.p && (this.isHost || !this.socket)) {
+            if (this.gameState === this.states.PLAYING) {
+                this.gameState = this.states.PAUSED;
+                if (this.socket) this.socket.emit('pauseGame');
+            } else if (this.gameState === this.states.PAUSED) {
+                this.gameState = this.states.PLAYING;
+                if (this.socket) this.socket.emit('resumeGame');
+            }
+            this.input.keys.p = false;
         }
 
         // Enter to Main Menu (Pause & Exit) from Playing/Paused
@@ -1244,6 +1832,12 @@ class Game {
         this.player.draw(ctx);
         this.player.draw(bCtx);
 
+        // Draw Remote Players
+        this.remotePlayers.forEach(player => {
+            player.draw(ctx);
+            player.draw(bCtx);
+        });
+
         ctx.restore();
         bCtx.restore();
 
@@ -1269,19 +1863,52 @@ class Game {
         // Draw Main HUD (Visual)
         this.ctx.font = 'bold 20px "Outfit", sans-serif';
 
-        this.ctx.fillStyle = '#00ccff';
-        // HUD Text - Offset downward to avoid Pause Button (y=20 to 80)
+        this.ctx.fillStyle = '#00ff88';
         const hudYOffset = 100;
-        this.ctx.fillText(`Score: ${this.score}`, 20, hudYOffset);
+        this.ctx.fillText(`FPS: ${this.fps}`, 20, hudYOffset);
+
+        if (this.socket && this.player.index) {
+            this.ctx.save();
+            this.ctx.textAlign = 'center';
+            this.ctx.fillStyle = '#ffffff';
+            let hostTag = this.isHost ? ' (SERVER)' : '';
+            this.ctx.fillText(`PLAYER ${this.player.index}${hostTag}`, this.width / 2, 40);
+            this.ctx.restore();
+        }
+
+        this.ctx.fillStyle = '#00ccff';
+        this.ctx.fillText(`Score: ${this.score}`, 20, hudYOffset + 30);
 
         this.ctx.fillStyle = '#ffff00';
-        this.ctx.fillText(`Coins: ${this.coins}`, 20, hudYOffset + 30);
+        this.ctx.fillText(`Coins: ${this.coins}`, 20, hudYOffset + 60);
 
         this.ctx.fillStyle = '#ff4444';
-        this.ctx.fillText(`Lives: ${'❤️'.repeat(this.lives)}`, 20, hudYOffset + 60);
+        const heart = '❤️';
+        this.ctx.fillText(`Lives: ${heart.repeat(Math.max(0, this.lives))}`, 20, hudYOffset + 90);
 
         this.ctx.fillStyle = '#00ff88';
-        this.ctx.fillText(`Warp ${this.warpLevel} Process: ${this.warpLevelKillCount} / ${this.killQuota}`, 20, hudYOffset + 90);
+        this.ctx.fillText(`Warp ${this.warpLevel} Process: ${this.warpLevelKillCount} / ${this.killQuota}`, 20, hudYOffset + 120);
+
+        // --- Leaderboard (Multiplayer Stats) ---
+        if (this.socket) {
+            this.ctx.font = 'bold 16px "Outfit", sans-serif';
+            this.ctx.fillStyle = '#ffffff';
+            this.ctx.fillText('LEADERBOARD', 20, hudYOffset + 160);
+
+            // Local Player
+            this.ctx.fillStyle = this.player.color;
+            let myHostTag = this.isHost ? ' (SERVER)' : '';
+            this.ctx.fillText(`YOU (PLAYER ${this.player.index || '1'}${myHostTag}): ${this.score} pts | ${this.enemiesDestroyed} kills`, 30, hudYOffset + 185);
+
+            // Remote Players
+            let rOffset = 210;
+            this.remotePlayers.forEach((p, id) => {
+                this.ctx.fillStyle = p.color;
+                let remoteHostTag = p.isHost ? ' (SERVER)' : '';
+                this.ctx.fillText(`PLAYER ${p.index}${remoteHostTag}: ${p.score || 0} pts | ${p.kills || 0} kills`, 30, hudYOffset + rOffset);
+                rOffset += 25;
+            });
+        }
 
         // Conditional Debug HUD
         if (this.showDebugHUD) {
@@ -1307,10 +1934,15 @@ class Game {
             this.ctx.fillText(`Max Enemy Speed: ${Math.round(maxEnemySpeed)}`, 20, 300);
         }
 
-        // Pause Button (Visible in Playing/Paused)
-        if (this.gameState === this.states.PLAYING || this.gameState === this.states.PAUSED) {
+        // Pause Button (Visible in Playing/Paused) - Only Host can toggle
+        if ((this.gameState === this.states.PLAYING || this.gameState === this.states.PAUSED)) {
             const pb = this.pauseBtnBounds;
             this.ctx.save();
+
+            // Only draw visual cue if not host (dimmed)
+            if (!this.isHost) {
+                this.ctx.globalAlpha = 0.3;
+            }
 
             // Background for better visibility
             this.ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
@@ -1411,21 +2043,31 @@ class Game {
     }
 
     nextLevel() {
+        if (this.selectedGameMode === 'MULTI') {
+            this.randomizeSpawnArea();
+        }
+
         this.warpLevel++;
         this.warpLevelKillCount = 0;
         this.enemiesSpawnedInLevel = 0;
         this.warpTimer = 0;
         this.warpMessageTimer = 3000;
         this.player.resetSpawnAnimation(); // Trigger player transition animation
-        this.sound.playExtraLife(); // Reuse for level up sound or create new
+        this.sound.playWarp(); // Explicit warp sound
 
         // Progressive speed by warp: warp 1=110, warp 2=120, ..., warp 5=150 (max)
-        // Formula: 100 + (warpLevel * 10), capped at 150
         this.baseSpeed = Math.min(150, 100 + (this.warpLevel * 10));
 
         // Reset player speed to the new base speed (unless in collision effect)
         if (this.player.collisionEffectTimer <= 0) {
             this.player.speed = this.baseSpeed;
+        }
+
+        // Host notifies others of next level
+        if (this.isHost && this.socket) {
+            this.socket.emit('worldState', {
+                state: this.getWorldState()
+            });
         }
     }
 
@@ -1474,6 +2116,18 @@ class Game {
             this.fpsTimer = 0;
         }
 
+        // Camera Warp/Teleport Transition
+        if (this.warpMessageTimer > 0) {
+            const t = (this.warpMessageDuration - this.warpMessageTimer) / this.warpMessageDuration;
+            // Smooth pulse: zoom goes from 1.0 -> 1.25 -> 1.0
+            this.camera.zoom = (window.zoomLevel || 1.0) + Math.sin(t * Math.PI) * 0.25;
+        } else if (this.player.isDashing) {
+            // Slight zoom in during dash travel
+            this.camera.zoom = (window.zoomLevel || 1.0) * 1.15;
+        } else {
+            this.camera.zoom = (window.zoomLevel || 1.0);
+        }
+
         // Limit deltaTime to avoid huge jumps if the tab was inactive
         const cappedDelta = Math.min(deltaTime, 100);
 
@@ -1493,6 +2147,12 @@ class Game {
         this.player.triggerArrowBlink();
         // But bullets use screen coordinates since player is centered on screen
         this.bullets.push(this.bulletPool.get(this, this.player.x, this.player.y, mouseX, mouseY));
+
+        // Notify server about shooting
+        if (this.socket) {
+            this.socket.emit('playerShoot', { mouseX, mouseY });
+        }
+
         this.sound.playShoot();
     }
 }

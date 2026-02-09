@@ -8,20 +8,20 @@ class Enemy {
         this.speed = this.baseSpeed;
         this.color = '#ff4444';
         this.markedForDeletion = false;
+        this.id = Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
 
-        // Spawn in a rectangular area around the player
-        this._setRectangularSpawnPosition();
-
-        // Clamp to world bounds
-        const halfW = this.game.worldWidth / 2;
-        const halfH = this.game.worldHeight / 2;
-        this.x = Math.max(-halfW, Math.min(halfW, this.x));
-        this.y = Math.max(-halfH, Math.min(halfH, this.y));
+        // Spawn on the edges of the world (outside perimeter)
+        this._setEdgeSpawnPosition();
 
         this.angle = 0;
 
-        // Ensure spawned enemy is not too far outside current camera view
-        this._adjustSpawnIntoView();
+        // Network Sync / Interpolation targets
+        this.targetX = this.x;
+        this.targetY = this.y;
+        this.targetAngle = this.angle;
+
+        // Ensure spawned enemy targets current position initially
+        // this._adjustSpawnIntoView(); // Disabled for edge spawning
 
         if (!Enemy.spriteCanvas) {
             Enemy.spriteCanvas = document.createElement('canvas');
@@ -46,9 +46,32 @@ class Enemy {
      * Maneja el movimiento de persecución y colisiones con el jugador.
      */
     updateState(deltaTime) {
-        // Chase player
-        const dx = this.game.player.x - this.x;
-        const dy = this.game.player.y - this.y;
+        // En multijugador, solo el HOST simula el movimiento de los enemigos.
+        // Los clientes interpolan las posiciones recibidas por red.
+        if (!this.game.isHost) return;
+
+        // Targeting logic: find the closest player
+        const allPlayers = [this.game.player, ...Array.from(this.game.remotePlayers.values())];
+
+        let minDistance = Infinity;
+        let closestPlayer = this.game.player;
+
+        allPlayers.forEach(p => {
+            const dx = p.x - this.x;
+            const dy = p.y - this.y;
+            const distSq = dx * dx + dy * dy; // Use squared distance for performance
+            if (distSq < minDistance) {
+                minDistance = distSq;
+                closestPlayer = p;
+            }
+        });
+
+        this.target = closestPlayer;
+        let target = this.target;
+
+        // Chase target
+        const dx = target.x - this.x;
+        const dy = target.y - this.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
 
         if (dist > 0) {
@@ -134,70 +157,115 @@ class Enemy {
     reset(game) {
         this.game = game;
         this.markedForDeletion = false;
+        this.id = Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
 
-        this._setRectangularSpawnPosition();
+        this._setEdgeSpawnPosition();
 
-        const halfW = this.game.worldWidth / 2;
-        const halfH = this.game.worldHeight / 2;
-        this.x = Math.max(-halfW, Math.min(halfW, this.x));
-        this.y = Math.max(-halfH, Math.min(halfH, this.y));
         this.angle = 0;
+        this.targetX = this.x;
+        this.targetY = this.y;
+        this.targetAngle = this.angle;
+
         // Limit enemy speed to 120% of player speed, max 180
         const maxSpeed = Math.min(180, this.game.baseSpeed * 1.2);
         this.baseSpeed = maxSpeed * (0.8 + Math.random() * 0.2);
         this.speed = this.baseSpeed;
-        this._adjustSpawnIntoView();
+        // this._adjustSpawnIntoView(); // Disabled for edge spawning
     }
 
     /**
-     * Helper to set position on the edges of a rectangle around the player/camera
+     * Set position on the outer edges of the world or within a designated spawn area
      */
-    _setRectangularSpawnPosition() {
-        const cam = this.game.camera;
-        const viewW = cam.width / cam.zoom;
-        const viewH = cam.height / cam.zoom;
+    _setEdgeSpawnPosition() {
+        // If there is a specific spawn area (e.g. Multiplayer red box), use it.
+        if (this.game.spawnArea) {
+            this.x = this.game.spawnArea.x + Math.random() * this.game.spawnArea.w;
+            this.y = this.game.spawnArea.y + Math.random() * this.game.spawnArea.h;
+            return;
+        }
 
-        // Reduced margins to bring spawning closer to the visible area
-        const marginW = 400;
-        const marginH = 400;
+        const halfW = this.game.worldWidth / 2;
+        const halfH = this.game.worldHeight / 2;
+        const margin = 100; // Spawn 100px outside perimeter
 
         const side = Math.floor(Math.random() * 4); // 0: Top, 1: Bottom, 2: Left, 3: Right
 
-        // Broaden the ranges to include the corner areas (points outside the screen-corners)
         switch (side) {
-            case 0: // Top edge (including corners)
-                this.x = cam.x - marginW + Math.random() * (viewW + 2 * marginW);
-                this.y = cam.y - marginH;
+            case 0: // Top edge
+                this.x = -halfW + Math.random() * this.game.worldWidth;
+                this.y = -halfH - margin;
                 break;
-            case 1: // Bottom edge (including corners)
-                this.x = cam.x - marginW + Math.random() * (viewW + 2 * marginW);
-                this.y = cam.y + viewH + marginH;
+            case 1: // Bottom edge
+                this.x = -halfW + Math.random() * this.game.worldWidth;
+                this.y = halfH + margin;
                 break;
-            case 2: // Left edge (including corners)
-                this.x = cam.x - marginW;
-                this.y = cam.y - marginH + Math.random() * (viewH + 2 * marginH);
+            case 2: // Left edge
+                this.x = -halfW - margin;
+                this.y = -halfH + Math.random() * this.game.worldHeight;
                 break;
-            case 3: // Right edge (including corners)
-                this.x = cam.x + viewW + marginW;
-                this.y = cam.y - marginH + Math.random() * (viewH + 2 * marginH);
+            case 3: // Right edge
+                this.x = halfW + margin;
+                this.y = -halfH + Math.random() * this.game.worldHeight;
                 break;
         }
+    }
 
-        // Clamp to world bounds
-        const halfW = this.game.worldWidth / 2;
-        const halfH = this.game.worldHeight / 2;
-        this.x = Math.max(-halfW, Math.min(halfW, this.x));
-        this.y = Math.max(-halfH, Math.min(halfH, this.y));
+    /**
+     * Spawns the enemy in a rectangular perimeter around the camera's current view.
+     */
+    /**
+     * Spawns the enemy in a rectangular perimeter around the camera's current view.
+     * @deprecated Use _setEdgeSpawnPosition instead.
+     */
+    _setRectangularSpawnPosition() {
+        // This method is now legacy as per user request to stick to spawn areas.
+        // Falling back to edge spawn logic.
+        this._setEdgeSpawnPosition();
     }
 
     _adjustSpawnIntoView() {
-        // With rectangular spawn directly based on camera, 
-        // this is mostly covered by _setRectangularSpawnPosition.
-        // We just ensure it's not exactly on top of the player.
+        // Check if spawn is too close to player
         const dx = this.x - this.game.player.x;
         const dy = this.y - this.game.player.y;
         if (Math.abs(dx) < 100 && Math.abs(dy) < 100) {
             this._setRectangularSpawnPosition();
         }
+    }
+
+    /**
+     * Set enemy state from network sync
+     */
+    setState(data) {
+        this.x = data.x;
+        this.y = data.y;
+        this.angle = data.angle;
+        this.speed = data.speed;
+        this.markedForDeletion = data.markedForDeletion;
+    }
+
+    /**
+     * Set interpolation targets from network sync
+     */
+    setTargetState(data) {
+        this.targetX = data.x;
+        this.targetY = data.y;
+        this.targetAngle = data.angle;
+        this.speed = data.speed;
+        this.markedForDeletion = data.markedForDeletion;
+    }
+
+    /**
+     * Smoothly interpolate position (Client-side use only)
+     */
+    updateInterpolation(deltaTime) {
+        // Simple lerp (0.2 factor for smooth movement)
+        this.x += (this.targetX - this.x) * 0.2;
+        this.y += (this.targetY - this.y) * 0.2;
+
+        // Angle interpolation (handle wrap-around if needed, but simple lerp works for small steps)
+        let diffAngle = this.targetAngle - this.angle;
+        while (diffAngle > Math.PI) diffAngle -= Math.PI * 2;
+        while (diffAngle < -Math.PI) diffAngle += Math.PI * 2;
+        this.angle += diffAngle * 0.2;
     }
 }

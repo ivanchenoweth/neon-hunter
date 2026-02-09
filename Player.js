@@ -4,6 +4,7 @@ class Player {
         this.radius = 10;
         this.x = 0;
         this.y = 0;
+        this.index = 1;
         this.speed = 110;
         this.color = '#00ff88';
         this.glow = '#00ff88';
@@ -12,10 +13,26 @@ class Player {
         this.arrowBlinkTimer = 0; // Timer for arrow blink effect when firing
 
         // Spawn Animation
-        this.spawnDuration = 2000; // 2 seconds
+        this.spawnDuration = 500; // 0.5 seconds (snappier teleport)
         this.spawnTimer = this.spawnDuration;
 
         this.collisionAlpha = 1.0; // Alpha during collision effect
+        this.collisionEffectTimer = 0;
+
+        // Interpolation targets
+        this.targetX = this.x;
+        this.targetY = this.y;
+
+        // Trail effect
+        this.trail = [];
+        this.maxTrailLength = 60;
+
+        // Dash effect
+        this.isDashing = false;
+        this.dashTimer = 0;
+        this.dashDuration = 100;
+        this.dashStartPos = { x: 0, y: 0 };
+        this.dashTarget = { x: 0, y: 0 };
 
         // Energy Rod / Laser Charge System
         this.isChargingBeam = false;
@@ -23,6 +40,12 @@ class Player {
         this.maxBeamChargeTime = 1500; // 1.5 seconds to max charge
         this.beamLength = 0;
         this.maxBeamLength = 2000; // Maximum distance of the laser (increased to reach beyond spawn area)
+
+        // Camera info for minimap (Multiplayer)
+        this.cameraX = 0;
+        this.cameraY = 0;
+        this.viewW = 0;
+        this.viewH = 0;
     }
 
     /**
@@ -31,6 +54,25 @@ class Player {
      * En un entorno multijugador, esto correría en el servidor.
      */
     updateState(deltaTime, input) {
+        if (this.isDashing) {
+            this.dashTimer += deltaTime;
+            const t = Math.min(1.0, this.dashTimer / this.dashDuration);
+
+            // Linear interpolation
+            this.x = this.dashStartPos.x + (this.dashTarget.x - this.dashStartPos.x) * t;
+            this.y = this.dashStartPos.y + (this.dashTarget.y - this.dashStartPos.y) * t;
+
+            if (t >= 1.0) {
+                this.isDashing = false;
+            }
+
+            // Return direction info for the trail even during dash
+            const dx = this.dashTarget.x - this.dashStartPos.x;
+            const dy = this.dashTarget.y - this.dashStartPos.y;
+            const mag = Math.sqrt(dx * dx + dy * dy);
+            return (mag > 0) ? { dx: dx / mag, dy: dy / mag } : { dx: 0, dy: 0 };
+        }
+
         // Update collision effect timer
         if (this.collisionEffectTimer > 0) {
             this.collisionEffectTimer -= deltaTime;
@@ -112,10 +154,14 @@ class Player {
 
         // Trail effect
         if (dx !== 0 || dy !== 0) {
-            this.trailTimer += deltaTime;
-            if (this.trailTimer > 50) {
-                this.game.particles.push(new Particle(this.game, this.x, this.y, this.color));
-                this.trailTimer = 0;
+            this.trail.unshift({ x: this.x, y: this.y });
+            if (this.trail.length > this.maxTrailLength) {
+                this.trail.pop();
+            }
+        } else {
+            // Decay trail when stopped
+            if (this.trail.length > 0) {
+                this.trail.pop();
             }
         }
     }
@@ -127,6 +173,27 @@ class Player {
     }
 
     draw(ctx) {
+        // Draw Trail first (behind player)
+        if (this.trail.length > 1) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.strokeStyle = this.color;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            for (let i = 0; i < this.trail.length - 1; i++) {
+                const alpha = (1 - i / this.trail.length) * 0.25 * this.collisionAlpha;
+                ctx.globalAlpha = alpha;
+                ctx.lineWidth = this.radius * 1.5 * (1 - i / this.trail.length);
+
+                ctx.beginPath();
+                ctx.moveTo(this.trail[i].x, this.trail[i].y);
+                ctx.lineTo(this.trail[i + 1].x, this.trail[i + 1].y);
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
         ctx.save();
 
         // Spawn Animation
@@ -138,12 +205,15 @@ class Player {
             const alpha = 1 - t; // 0 -> 1
             const blur = t * 20; // 20px -> 0px
 
-            ctx.filter = `blur(${blur}px)`;
+            const blurVal = Math.max(0, blur);
+            if (ctx.filter !== undefined) {
+                ctx.filter = `blur(${blurVal}px)`;
+            }
             ctx.globalAlpha = alpha;
 
             // Translate to center for scaling
             ctx.translate(this.x, this.y);
-            ctx.scale(scale, scale);
+            ctx.scale(Math.max(0.1, scale), Math.max(0.1, scale));
             ctx.translate(-this.x, -this.y);
         } else {
             // Apply collision alpha and dynamic blink effect
@@ -256,6 +326,20 @@ class Player {
 
             ctx.restore();
         }
+
+        // Draw Player Name Tag
+        ctx.save();
+        ctx.font = 'bold 14px "Outfit", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = this.color;
+        let pLabel = `PLAYER ${this.index || '?'}`;
+        if (this === this.game.player) pLabel = `YOU (${pLabel})`;
+        if (this.isHost) pLabel += ' (SERVER)';
+
+        ctx.shadowBlur = 4;
+        ctx.shadowColor = 'rgba(0,0,0,0.8)';
+        ctx.fillText(pLabel, this.x, this.y - this.radius - 15);
+        ctx.restore();
 
         ctx.restore();
     }

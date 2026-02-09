@@ -1,6 +1,7 @@
 class Background {
-    constructor(game) {
+    constructor(game, seed = 12345) {
         this.game = game;
+        this.seed = seed;
         this.starCount = 400; // Increased density
         this.stars = [];
         this.createStars();
@@ -10,13 +11,21 @@ class Background {
         this.gridPattern = this.createGridPattern();
     }
 
+    // Simple seeded random generator (LCG)
+    seededRandom() {
+        this.seed = (this.seed * 9301 + 49297) % 233280;
+        return this.seed / 233280;
+    }
+
     createStars() {
+        const rng = () => this.seededRandom();
+
         for (let i = 0; i < this.starCount; i++) {
             this.stars.push({
-                x: (Math.random() - 0.5) * (this.game.worldWidth + 2000),
-                y: (Math.random() - 0.5) * (this.game.worldHeight + 2000),
-                size: Math.random() * 2 + 0.5,
-                alpha: Math.random()
+                x: (rng() - 0.5) * (this.game.worldWidth + 2000),
+                y: (rng() - 0.5) * (this.game.worldHeight + 2000),
+                size: rng() * 2 + 0.5,
+                alpha: rng()
             });
         }
 
@@ -25,26 +34,26 @@ class Background {
         const types = ['planet', 'comet', 'comet', 'galaxy']; // Doubled comet ratio
 
         for (let i = 0; i < objectCount; i++) {
-            const type = types[Math.floor(Math.random() * types.length)];
+            const type = types[Math.floor(rng() * types.length)];
             const obj = {
                 type: type,
-                x: (Math.random() - 0.5) * (this.game.worldWidth + 1500),
-                y: (Math.random() - 0.5) * (this.game.worldHeight + 1500),
-                size: 30 + Math.random() * 50,
-                color: `hsl(${Math.random() * 360}, 40%, 50%)`,
-                alpha: 0.2 + Math.random() * 0.3
+                x: (rng() - 0.5) * (this.game.worldWidth + 1500),
+                y: (rng() - 0.5) * (this.game.worldHeight + 1500),
+                size: 30 + rng() * 50,
+                color: `hsl(${rng() * 360}, 40%, 50%)`,
+                alpha: 0.2 + rng() * 0.3
             };
 
             if (type === 'planet') {
                 obj.hasRing = true; // All planets are now Saturn-like
-                obj.ringColor = `hsla(${Math.random() * 360}, 40%, 70%, 0.3)`;
-                obj.ringAngle = Math.random() * Math.PI;
+                obj.ringColor = `hsla(${rng() * 360}, 40%, 70%, 0.3)`;
+                obj.ringAngle = rng() * Math.PI;
             } else if (type === 'comet') {
-                obj.angle = Math.random() * Math.PI * 2;
-                obj.tailLength = 60 + Math.random() * 100;
+                obj.angle = rng() * Math.PI * 2;
+                obj.tailLength = 60 + rng() * 100;
             } else if (type === 'galaxy') {
-                obj.rotation = Math.random() * Math.PI * 2;
-                obj.arms = 2 + Math.floor(Math.random() * 3);
+                obj.rotation = rng() * Math.PI * 2;
+                obj.arms = 2 + Math.floor(rng() * 3);
                 obj.points = [];
                 for (let arm = 0; arm < obj.arms; arm++) {
                     const armOffset = (arm / obj.arms) * Math.PI * 2;
@@ -53,12 +62,12 @@ class Background {
                         const r = ratio * obj.size;
                         const a = ratio * Math.PI * 3 + armOffset;
                         // Add some variance to points
-                        const dx = (Math.random() - 0.5) * 5;
-                        const dy = (Math.random() - 0.5) * 5;
+                        const dx = (rng() - 0.5) * 5;
+                        const dy = (rng() - 0.5) * 5;
                         obj.points.push({
                             x: Math.cos(a) * r + dx,
                             y: Math.sin(a) * r + dy,
-                            size: Math.random() * 1.5 + 0.5
+                            size: rng() * 1.5 + 0.5
                         });
                     }
                 }

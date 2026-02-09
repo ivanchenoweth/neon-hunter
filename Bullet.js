@@ -1,18 +1,28 @@
 class Bullet {
-    constructor(game, x, y, targetX, targetY) {
+    constructor(game, x, y, targetX, targetY, shooter = null) {
         this.game = game;
         this.x = x;
         this.y = y;
         this.speed = 600;
         this.radius = 1.5;
-        this.color = '#ffff00';
+        this.color = shooter ? shooter.color : '#ffff00';
         this.markedForDeletion = false;
 
-        // Use the player's pre-calculated fire direction for perfect sync with arrow
-        this.dx = game.player.fireDirection.x;
-        this.dy = game.player.fireDirection.y;
+        // Use shooter's fire direction or calculate from target
+        if (shooter) {
+            this.dx = shooter.fireDirection.x;
+            this.dy = shooter.fireDirection.y;
+        } else {
+            // Default calculation (single player fallback)
+            const centerX = this.game.width / 2;
+            const centerY = this.game.height / 2;
+            const dx = targetX - centerX;
+            const dy = targetY - centerY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            this.dx = dx / dist;
+            this.dy = dy / dist;
+        }
 
-        // Calculate angle for sprite rotation
         this.angle = Math.atan2(this.dy, this.dx);
 
         if (!Bullet.spriteCanvas) {
@@ -52,22 +62,26 @@ class Bullet {
         ctx.restore();
     }
 
-    reset(game, x, y, targetX, targetY) {
+    reset(game, x, y, targetX, targetY, shooter = null) {
         this.game = game;
         this.x = x;
         this.y = y;
         this.speed = 600;
         this.markedForDeletion = false;
+        this.color = shooter ? shooter.color : '#ffff00';
 
-        const centerX = this.game.width / 2;
-        const centerY = this.game.height / 2;
-
-        const dx = targetX - centerX;
-        const dy = targetY - centerY;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-
-        this.dx = (dx / distance);
-        this.dy = (dy / distance);
-        this.angle = Math.atan2(dy, dx);
+        if (shooter) {
+            this.dx = shooter.fireDirection.x;
+            this.dy = shooter.fireDirection.y;
+        } else {
+            const centerX = this.game.width / 2;
+            const centerY = this.game.height / 2;
+            const dx = targetX - centerX;
+            const dy = targetY - centerY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            this.dx = (dx / distance);
+            this.dy = (dy / distance);
+        }
+        this.angle = Math.atan2(this.dy, this.dx);
     }
 }
