@@ -184,28 +184,34 @@ class Enemy {
             return;
         }
 
-        const halfW = this.game.worldWidth / 2;
-        const halfH = this.game.worldHeight / 2;
-        const margin = 100; // Spawn 100px outside perimeter
+        // If no explicit spawn area (Single Player), spawn relative to Camera
+        const camX = this.game.camera.x;
+        const camY = this.game.camera.y;
+
+        // Calculate visible viewport in world coordinates
+        const viewW = this.game.width / this.game.camera.zoom;
+        const viewH = this.game.height / this.game.camera.zoom;
+
+        const margin = 100; // Distance outside the view to spawn
 
         const side = Math.floor(Math.random() * 4); // 0: Top, 1: Bottom, 2: Left, 3: Right
 
         switch (side) {
-            case 0: // Top edge
-                this.x = -halfW + Math.random() * this.game.worldWidth;
-                this.y = -halfH - margin;
+            case 0: // Top edge (just above view)
+                this.x = camX + Math.random() * viewW;
+                this.y = camY - margin;
                 break;
-            case 1: // Bottom edge
-                this.x = -halfW + Math.random() * this.game.worldWidth;
-                this.y = halfH + margin;
+            case 1: // Bottom edge (just below view)
+                this.x = camX + Math.random() * viewW;
+                this.y = camY + viewH + margin;
                 break;
-            case 2: // Left edge
-                this.x = -halfW - margin;
-                this.y = -halfH + Math.random() * this.game.worldHeight;
+            case 2: // Left edge (just left of view)
+                this.x = camX - margin;
+                this.y = camY + Math.random() * viewH;
                 break;
-            case 3: // Right edge
-                this.x = halfW + margin;
-                this.y = -halfH + Math.random() * this.game.worldHeight;
+            case 3: // Right edge (just right of view)
+                this.x = camX + viewW + margin;
+                this.y = camY + Math.random() * viewH;
                 break;
         }
     }

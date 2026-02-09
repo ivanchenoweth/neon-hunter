@@ -18,6 +18,32 @@ let hostId = null;
 const WORLD_WIDTH = 4000;
 const WORLD_HEIGHT = 4000;
 
+// Server-side Game State
+const gameState = {
+  warpLevel: 1,
+  killCount: 0,
+  killQuota: 100,
+  spawnArea: null
+};
+
+function randomizeSpawnArea() {
+  const areaSize = 800; // Same as client
+  const halfW = WORLD_WIDTH / 2;
+  const halfH = WORLD_HEIGHT / 2;
+
+  // Ensure the area is within world bounds
+  const x = (Math.random() * (WORLD_WIDTH - areaSize)) - halfW;
+  const y = (Math.random() * (WORLD_HEIGHT - areaSize)) - halfH;
+
+  gameState.spawnArea = { x, y, w: areaSize, h: areaSize };
+  console.log('New Spawn Area:', gameState.spawnArea);
+  // Broadcast to all clients
+  io.emit('spawnAreaUpdated', gameState.spawnArea);
+}
+
+// Initial Spawn Area
+randomizeSpawnArea();
+
 function getNextAvailableIndex() {
   const usedIndices = Object.values(players).map(p => p.index);
   let index = 1;
@@ -31,14 +57,26 @@ function getRandomSpawnPoint() {
   const playersArr = Object.values(players);
   let bestPos = { x: 0, y: 0 };
   let maxMinDist = -1;
+  const safeDistance = 1000; // Minimum distance from spawn area center
 
-  // Try 10 random positions and pick the one farthest from the closest player
-  for (let i = 0; i < 10; i++) {
+  // Try 20 random positions
+  for (let i = 0; i < 20; i++) {
     const testPos = {
       x: (Math.random() - 0.5) * (WORLD_WIDTH * 0.8),
       y: (Math.random() - 0.5) * (WORLD_HEIGHT * 0.8)
     };
 
+    // 1. Check strict collision/proximity with Spawn Area
+    if (gameState.spawnArea) {
+      const spawnCenterX = gameState.spawnArea.x + gameState.spawnArea.w / 2;
+      const spawnCenterY = gameState.spawnArea.y + gameState.spawnArea.h / 2;
+      const distToSpawn = Math.sqrt(Math.pow(testPos.x - spawnCenterX, 2) + Math.pow(testPos.y - spawnCenterY, 2));
+
+      // If too close to enemy spawn, discard this point immediately
+      if (distToSpawn < safeDistance) continue;
+    }
+
+    // 2. Maximize distance from other players
     if (playersArr.length === 0) return testPos;
 
     let minDist = Infinity;
@@ -52,6 +90,16 @@ function getRandomSpawnPoint() {
       bestPos = testPos;
     }
   }
+
+  // If we couldn't find a "best" one, force a safe position
+  if (maxMinDist === -1) {
+    if (gameState.spawnArea) {
+      // Place at opposite quadrant
+      bestPos.x = -gameState.spawnArea.x;
+      bestPos.y = -gameState.spawnArea.y;
+    }
+  }
+
   return bestPos;
 }
 
@@ -61,6 +109,7 @@ io.on('connection', (socket) => {
 
   // Initial state for the new player with random spawn
   const spawn = getRandomSpawnPoint();
+
   players[socket.id] = {
     id: socket.id,
     index: index,
@@ -84,6 +133,9 @@ io.on('connection', (socket) => {
   socket.emit('currentPlayers', players);
   socket.emit('hostAssigned', hostId);
 
+  // Send authoritative Server State immediately
+  socket.emit('serverGameState', gameState);
+
   // Notify others about the new player
   socket.broadcast.emit('newPlayer', players[socket.id]);
 
@@ -105,7 +157,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Host-specific events
+  // Host-specific events (for entity spawning logic that is still host-driven)
   socket.on('enemySpawned', (enemyData) => {
     if (socket.id === hostId) {
       socket.broadcast.emit('enemySpawned', enemyData);
@@ -141,13 +193,36 @@ io.on('connection', (socket) => {
   });
 
   socket.on('enemyKilled', (enemyId) => {
+    // Relay destruction for visual effects
     socket.broadcast.emit('enemyDestroyed', enemyId);
+
+    // Update Server State (Authoritative Kill Tracking)
+    gameState.killCount++;
+    io.emit('killCountUpdate', gameState.killCount);
+
+    // Debug log to check progress
+    console.log(`Enemy Killed! Current: ${gameState.killCount}, Target: ${gameState.killQuota}, Level: ${gameState.warpLevel}`);
+
+    if (gameState.killCount >= gameState.killQuota) {
+      // WARP!
+      console.log(`--- TRIGGERING WARP (Count ${gameState.killCount} >= ${gameState.killQuota}) ---`);
+
+      gameState.warpLevel++;
+      gameState.killCount = 0;
+      // Maybe scale quota slightly? Or keep flat? Let's bump it slightly for fun, or not.
+      // gameState.killQuota += 20;
+
+      // Randomize spawn area for next level
+      randomizeSpawnArea();
+
+      // Broadcast Warp event with new state
+      io.emit('warpLevelUp', gameState);
+    }
   });
 
   socket.on('spawnAreaUpdated', (spawnAreaData) => {
-    if (socket.id === hostId) {
-      socket.broadcast.emit('spawnAreaUpdated', spawnAreaData);
-    }
+    // Ignore client updates for spawn area, server is authority
+    // (Optionally log it)
   });
 
   socket.on('foodCollected', (foodId) => {
@@ -155,6 +230,10 @@ io.on('connection', (socket) => {
   });
 
   socket.on('requestWorldState', () => {
+    // Always send server state first
+    socket.emit('serverGameState', gameState);
+
+    // Then ask host for dynamic entities if someone else is host
     if (hostId && hostId !== socket.id) {
       io.to(hostId).emit('requestWorldState', socket.id);
     }
@@ -163,6 +242,12 @@ io.on('connection', (socket) => {
   socket.on('worldState', (data) => {
     // Relay world state from host to the specific player who requested it
     if (data.to) {
+      // Overwrite with Server Authority
+      data.state.warpLevel = gameState.warpLevel;
+      data.state.warpLevelKillCount = gameState.killCount;
+      data.state.killQuota = gameState.killQuota;
+      data.state.spawnArea = gameState.spawnArea;
+
       io.to(data.to).emit('worldState', data.state);
     }
   });

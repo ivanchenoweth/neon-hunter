@@ -327,19 +327,22 @@ class Player {
             ctx.restore();
         }
 
-        // Draw Player Name Tag
-        ctx.save();
-        ctx.font = 'bold 14px "Outfit", sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillStyle = this.color;
-        let pLabel = `PLAYER ${this.index || '?'}`;
-        if (this === this.game.player) pLabel = `YOU (${pLabel})`;
-        if (this.isHost) pLabel += ' (SERVER)';
+        // Draw Player Name Tag (Multiplayer Only)
+        if (this.game.selectedGameMode === 'MULTI') {
+            ctx.save();
+            ctx.font = 'bold 14px "Outfit", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = this.color;
+            let pLabel = `PLAYER ${this.index || '?'}`;
+            if (this === this.game.player) pLabel = `YOU (${pLabel})`;
+            // Only show SERVER tag if it's relevant (remote host or local host in MP)
+            if (this.isHost) pLabel += ' (SERVER)';
 
-        ctx.shadowBlur = 4;
-        ctx.shadowColor = 'rgba(0,0,0,0.8)';
-        ctx.fillText(pLabel, this.x, this.y - this.radius - 15);
-        ctx.restore();
+            ctx.shadowBlur = 4;
+            ctx.shadowColor = 'rgba(0,0,0,0.8)';
+            ctx.fillText(pLabel, this.x, this.y - this.radius - 15);
+            ctx.restore();
+        }
 
         ctx.restore();
     }

@@ -160,8 +160,12 @@ class Game {
     }
 
     initMultiplayer() {
-        if (typeof io === 'undefined') {
+        if (typeof io === 'undefined' || this.selectedGameMode === 'SINGLE') {
             return;
+        }
+
+        if (this.socket && this.socket.connected) {
+            return; // Already connected
         }
 
         this.socket = io();
@@ -372,18 +376,37 @@ class Game {
                 enemy.markedForDeletion = true;
                 this.createExplosion(enemy.x, enemy.y, enemy.color);
 
-                // If I am Host and a client destroyed an enemy, I must also count it for level progress
-                if (this.isHost) {
-                    this.score += 10;
-                    this.enemiesDestroyed++;
-                    this.warpLevelKillCount++;
-                    this.updateScore();
-
-                    if (this.warpLevelKillCount >= this.killQuota && this.enemies.length <= 1 && this.warpMessageTimer <= 0) {
-                        this.nextLevel();
-                    }
-                }
+                // Visual score update only - Server tracks the real progress
+                this.score += 10;
             }
+        });
+
+        // Server Authority Events
+        this.socket.on('serverGameState', (state) => {
+            console.log('--- SYNC WITH SERVER STATE ---', state);
+            this.warpLevel = state.warpLevel;
+            this.warpLevelKillCount = state.killCount;
+            this.killQuota = state.killQuota;
+            if (state.spawnArea) {
+                this.spawnArea = state.spawnArea;
+            }
+        });
+
+        this.socket.on('killCountUpdate', (count) => {
+            this.warpLevelKillCount = count;
+            this.enemiesDestroyed = count; // Ensure local HUD reflects server count
+        });
+
+        this.socket.on('warpLevelUp', (state) => {
+            console.log('--- SERVER WARP COMMAND ---');
+            // Update local state from server
+            this.warpLevel = state.warpLevel;
+            this.warpLevelKillCount = 0;
+            this.killQuota = state.killQuota; // Should be consistent
+            this.spawnArea = state.spawnArea; // New area from server
+
+            // Trigger local transition effects
+            this.performWarpTransition();
         });
 
         // Force an immediate network sync to broadcast camera info upon joining
@@ -614,10 +637,13 @@ class Game {
     }
 
     startGame() {
-        if (this.selectedGameMode === 'MULTI' && this.isHost) {
-            this.randomizeSpawnArea();
+        if (this.selectedGameMode === 'MULTI') {
+            // In Multiplayer, Spawn Area is provided by Server (via serverGameState/warpLevelUp)
+            // Do NOT randomize distinct spawn area here. 
+            // We rely on what the server sent us in `initMultiplayer` or `serverGameState`
         } else if (this.selectedGameMode === 'SINGLE') {
-            this.spawnArea = null;
+            this.spawnArea = null; // Or randomize if you want single player to have it
+            // For now, Single Player = No Spawn Area Restriction (classic mode) or call randomizeSpawnArea() if desired
         }
 
         this.sessionActive = true;
@@ -737,6 +763,10 @@ class Game {
                         if (m.mode === 'MULTI') {
                             this.initMultiplayer();
                         } else {
+                            if (this.socket) {
+                                this.socket.disconnect();
+                                this.socket = null;
+                            }
                             this.isHost = true; // Single player is always host of their own world
                         }
                         this.menuStage = 'INPUT';
@@ -1602,7 +1632,15 @@ class Game {
         this.enemyTimer += deltaTime;
         const spawnInterval = this.enemies.length === 0 ? this.enemyInterval / 2 : this.enemyInterval;
 
+        // STRICT SPAWN LOGIC:
+        // The level has a fixed budget of enemies (e.g., 100).
+        // We spawn exactly that many. Once 100 have been spawned, no new ones appear.
+        // Existing enemies that go off-screen are RECYCLED (reset), not destroyed.
+        // This ensures that exactly 100 kills are required to clear the level, matching the spawn count.
+
         if (this.enemyTimer > spawnInterval && this.enemies.length < 100) {
+
+            // Only spawn if we haven't exhausted the level's ticket supply
             if (this.enemiesSpawnedInLevel < this.killQuota) {
                 const enemy = this.enemyPool.get(this);
                 this.enemies.push(enemy);
@@ -1669,9 +1707,15 @@ class Game {
                             this.score += 10;
                             this.enemiesDestroyed++;
                             this.warpLevelKillCount++;
-                            if (this.warpLevelKillCount >= this.killQuota && this.enemies.length <= 1 && this.warpMessageTimer <= 0) {
-                                this.nextLevel();
+
+                            // Single Player Logic: Check for level up locally
+                            if (this.selectedGameMode === 'SINGLE') {
+                                if (this.warpLevelKillCount >= this.killQuota && this.enemies.length <= 1 && this.warpMessageTimer <= 0) {
+                                    this.nextLevel();
+                                }
                             }
+                            // Multiplayer Logic: Do nothing locally. Server tracks kills and sends 'warpLevelUp'.
+
                             this.updateScore();
                             this.createExplosion(enemy.x, enemy.y, enemy.color);
                         }
@@ -1867,7 +1911,7 @@ class Game {
         const hudYOffset = 100;
         this.ctx.fillText(`FPS: ${this.fps}`, 20, hudYOffset);
 
-        if (this.socket && this.player.index) {
+        if (this.selectedGameMode === 'MULTI' && this.socket && this.player.index) {
             this.ctx.save();
             this.ctx.textAlign = 'center';
             this.ctx.fillStyle = '#ffffff';
@@ -1890,7 +1934,7 @@ class Game {
         this.ctx.fillText(`Warp ${this.warpLevel} Process: ${this.warpLevelKillCount} / ${this.killQuota}`, 20, hudYOffset + 120);
 
         // --- Leaderboard (Multiplayer Stats) ---
-        if (this.socket) {
+        if (this.selectedGameMode === 'MULTI' && this.socket) {
             this.ctx.font = 'bold 16px "Outfit", sans-serif';
             this.ctx.fillStyle = '#ffffff';
             this.ctx.fillText('LEADERBOARD', 20, hudYOffset + 160);
@@ -2043,17 +2087,32 @@ class Game {
     }
 
     nextLevel() {
-        if (this.selectedGameMode === 'MULTI') {
+        // This method receives the command to go to next level
+        // In Single Player: It calculates logic.
+        // In Multi Player: This should ONLY be called if Server triggered it (or we are simulating for single player)
+
+        if (this.selectedGameMode === 'SINGLE') {
+            // Single Player Logic
+            this.warpLevel++;
+            this.warpLevelKillCount = 0;
             this.randomizeSpawnArea();
         }
 
-        this.warpLevel++;
-        this.warpLevelKillCount = 0;
+        this.performWarpTransition();
+    }
+
+    performWarpTransition() {
         this.enemiesSpawnedInLevel = 0;
         this.warpTimer = 0;
         this.warpMessageTimer = 3000;
         this.player.resetSpawnAnimation(); // Trigger player transition animation
         this.sound.playWarp(); // Explicit warp sound
+
+        // Clear existing enemies for clean slate
+        this.enemies.forEach(e => {
+            e.markedForDeletion = true; // Mark for pool cleanup
+            this.createExplosion(e.x, e.y, e.color); // Fun effect
+        });
 
         // Progressive speed by warp: warp 1=110, warp 2=120, ..., warp 5=150 (max)
         this.baseSpeed = Math.min(150, 100 + (this.warpLevel * 10));
@@ -2063,11 +2122,10 @@ class Game {
             this.player.speed = this.baseSpeed;
         }
 
-        // Host notifies others of next level
+        // Host notifies others of next level (redundant if server sent it, but good for state consistency if logic mixed)
         if (this.isHost && this.socket) {
-            this.socket.emit('worldState', {
-                state: this.getWorldState()
-            });
+            // In server-authoritative mode, maybe we don't need to send worldState here, 
+            // but it doesn't hurt to sync fresh state just in case.
         }
     }
 
