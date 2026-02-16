@@ -115,7 +115,9 @@ class Enemy {
 
         // Collision with player (target is the closest player)
         const isTargetInvincible = target.collisionEffectTimer > 0;
-        if (!isTargetInvincible && dist < target.radius + this.size / 2) {
+        // Host uses a slightly more permissive collision radius for remote players to account for network lag/interpolation
+        const collisionBuffer = (target === this.game.player) ? 0 : 15;
+        if (!isTargetInvincible && dist < (target.radius + this.size / 2 + collisionBuffer)) {
             this.markedForDeletion = true;
 
             // Trigger collision effect on the specific player that was hit
@@ -142,11 +144,12 @@ class Enemy {
                 // If it's a remote player, the host detected they were hit.
                 // We notify the server that the remote player killed the enemy (via collision).
                 // The server will update the remote player's stats and global room progression.
-                if (this.game.socket) {
+                if (this.game.socket && target.id) {
                     this.game.socket.emit('enemyKilled', this.id, target.id);
                     // Notify the remote player that they were hit
                     this.game.socket.emit('playerHit', { targetId: target.id });
                 }
+                target.triggerCollisionEffect(); // Added: Prevent multiple hits on host side
             }
 
             // Explosion particles (Client-side)

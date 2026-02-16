@@ -337,6 +337,7 @@ class Game {
                 player.coins = stats.coins || 0;
                 player.restarts = stats.restarts || 0;
                 player.gameState = stats.gameState;
+                player.lives = stats.lives; // Added: sync lives for visual/scoreboard consistency
             }
 
             // Check if everyone is finished in multiplayer
@@ -464,7 +465,12 @@ class Game {
             this.performWarpTransition();
         });
 
-        this.socket.on('takeDamage', () => {
+        this.socket.on('takeDamage', (data) => {
+            // Safety check: only process if the target is actually this player
+            if (data && data.targetId && data.targetId !== this.socket.id) {
+                console.log(`[IGNORE] Damage intended for ${data.targetId}, I am ${this.socket.id}`);
+                return;
+            }
             console.log('Received damage command from server');
             this.takeDamage();
         });
@@ -558,7 +564,8 @@ class Game {
                 kills: this.enemiesDestroyed,
                 coins: this.coins,
                 restarts: this.restarts,
-                gameState: this.gameState
+                gameState: this.gameState,
+                lives: this.lives // Added: sync lives
             });
         }
     }
@@ -765,6 +772,8 @@ class Game {
         if (this.gameState !== this.states.PLAYING) return;
 
         this.lives--;
+        this.player.triggerCollisionEffect(); // Added: Trigger invincibility/blink on local client
+        this.updateScore(); // Added: Sync life reduction with server/host
         this.sound.playDamage();
         this.camera.shake(20, 300);
 
@@ -1333,6 +1342,8 @@ class Game {
                     rp.x += (rp.targetX - rp.x) * lerpFactor;
                     rp.y += (rp.targetY - rp.y) * lerpFactor;
                 }
+                // Update timers (like collisionEffectTimer) even on Host
+                rp.updateState(deltaTime, null);
             });
         }
 

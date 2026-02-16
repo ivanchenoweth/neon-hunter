@@ -150,6 +150,7 @@ io.on('connection', (socket) => {
     socket.emit('currentPlayers', room.players);
     socket.emit('hostAssigned', room.hostId);
     socket.emit('serverGameState', room.gameState);
+    socket.emit('initMultiplayer', { id: socket.id, roomId: roomId });
     socket.broadcast.to(roomId).emit('newPlayer', room.players[socket.id]);
 
     console.log(`Jugador ${socket.id} (P${index}) unido a sala ${roomId}`);
@@ -169,6 +170,7 @@ io.on('connection', (socket) => {
       const player = currentRoom.players[socket.id];
       player.score = stats.score;
       player.kills = stats.kills;
+      player.lives = stats.lives; // Added: sync lives
 
       // If host restarts (state moves from GAME_OVER/SPECTATING to PLAYING), reset room state
       if (player.isHost && stats.gameState === 'PLAYING') {
@@ -265,8 +267,10 @@ io.on('connection', (socket) => {
 
   socket.on('playerHit', (hitData) => {
     if (currentRoom && hitData.targetId) {
-      // Forward the "take damage" signal only to the specific client that was hit
-      io.to(hitData.targetId).emit('takeDamage');
+      console.log(`[HIT] Room: ${currentRoom.id}, Target: ${hitData.targetId}, From: ${socket.id}`);
+      // Forward the "take damage" signal to the specific client
+      // We use io.to().emit as primary and also a broadcast as fallback/sync
+      io.to(hitData.targetId).emit('takeDamage', { targetId: hitData.targetId });
     }
   });
 

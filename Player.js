@@ -110,33 +110,35 @@ class Player {
         let dx = 0;
         let dy = 0;
 
-        // NOTA: En multijugador, aquí se enviaría el input al servidor
-        // y se esperaría la validación de la posición.
-        // Preferir joystick izquierdo si está activo (multitouch)
-        if (input.joystickLeft && input.joystickLeft.active) {
-            dx = input.joystickLeft.x;
-            dy = input.joystickLeft.y;
-        } else {
-            if (input.keys.w) dy -= 1;
-            if (input.keys.s) dy += 1;
-            if (input.keys.a) dx -= 1;
-            if (input.keys.d) dx += 1;
+        if (input) {
+            // NOTA: En multijugador, aquí se enviaría el input al servidor
+            // y se esperaría la validación de la posición.
+            // Preferir joystick izquierdo si está activo (multitouch)
+            if (input.joystickLeft && input.joystickLeft.active) {
+                dx = input.joystickLeft.x;
+                dy = input.joystickLeft.y;
+            } else {
+                if (input.keys.w) dy -= 1;
+                if (input.keys.s) dy += 1;
+                if (input.keys.a) dx -= 1;
+                if (input.keys.d) dx += 1;
+            }
+
+            if (dx !== 0 || dy !== 0) {
+                const length = Math.sqrt(dx * dx + dy * dy);
+                dx /= length;
+                dy /= length;
+            }
+
+            this.x += dx * this.speed * (deltaTime / 1000);
+            this.y += dy * this.speed * (deltaTime / 1000);
+
+            // Clamp player position within world boundaries
+            const halfWidth = this.game.worldWidth / 2;
+            const halfHeight = this.game.worldHeight / 2;
+            this.x = Math.max(-halfWidth + this.radius, Math.min(halfWidth - this.radius, this.x));
+            this.y = Math.max(-halfHeight + this.radius, Math.min(halfHeight - this.radius, this.y));
         }
-
-        if (dx !== 0 || dy !== 0) {
-            const length = Math.sqrt(dx * dx + dy * dy);
-            dx /= length;
-            dy /= length;
-        }
-
-        this.x += dx * this.speed * (deltaTime / 1000);
-        this.y += dy * this.speed * (deltaTime / 1000);
-
-        // Clamp player position within world boundaries
-        const halfWidth = this.game.worldWidth / 2;
-        const halfHeight = this.game.worldHeight / 2;
-        this.x = Math.max(-halfWidth + this.radius, Math.min(halfWidth - this.radius, this.x));
-        this.y = Math.max(-halfHeight + this.radius, Math.min(halfHeight - this.radius, this.y));
 
         return { dx, dy }; // Devolvemos info para la lógica visual
     }
