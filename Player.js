@@ -46,6 +46,7 @@ class Player {
         this.cameraY = 0;
         this.viewW = 0;
         this.viewH = 0;
+        this.coins = 0;
     }
 
     /**

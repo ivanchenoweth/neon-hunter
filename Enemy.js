@@ -50,13 +50,24 @@ class Enemy {
         // Los clientes interpolan las posiciones recibidas por red.
         if (!this.game.isHost) return;
 
-        // Targeting logic: find the closest player
+        // Targeting logic: find the closest active player
         const allPlayers = [this.game.player, ...Array.from(this.game.remotePlayers.values())];
+        const activePlayers = allPlayers.filter(p => {
+            const state = (p === this.game.player) ? this.game.gameState : p.gameState;
+            // Treat undefined as PLAYING (default for new players)
+            return state === this.game.states.PLAYING || state === undefined;
+        });
+
+        if (activePlayers.length === 0) {
+            // No targetable players; enemies stop and wait
+            this.target = null;
+            return;
+        }
 
         let minDistance = Infinity;
-        let closestPlayer = this.game.player;
+        let closestPlayer = activePlayers[0];
 
-        allPlayers.forEach(p => {
+        activePlayers.forEach(p => {
             const dx = p.x - this.x;
             const dy = p.y - this.y;
             const distSq = dx * dx + dy * dy; // Use squared distance for performance
@@ -102,27 +113,40 @@ class Enemy {
             }
         });
 
-        // Collision with player
-        // Skip collision entirely if player is invulnerable (blinking)
-        const isInvincible = this.game.player.collisionEffectTimer > 0;
-        if (!isInvincible && dist < this.game.player.radius + this.size / 2) {
+        // Collision with player (target is the closest player)
+        const isTargetInvincible = target.collisionEffectTimer > 0;
+        if (!isTargetInvincible && dist < target.radius + this.size / 2) {
             this.markedForDeletion = true;
 
-            // Trigger collision effect (speed reduction + alpha reduction)
-            this.game.player.triggerCollisionEffect();
+            // Trigger collision effect on the specific player that was hit
+            if (target.triggerCollisionEffect) target.triggerCollisionEffect();
 
-            // Esta parte afecta al estado global del juego
-            this.game.takeDamage();
+            // If it's the local player (host), handle damage and local stats
+            if (target === this.game.player) {
+                this.game.takeDamage();
+                this.game.score += 10;
+                this.game.enemiesDestroyed++;
+                this.game.updateScore();
 
-            // Grant points and kill count
-            this.game.score += 10;
-            this.game.enemiesDestroyed++;
-            this.game.updateScore();
-
-            // Count collision as a kill for progress (User Request)
-            this.game.warpLevelKillCount++;
-            if (this.game.warpLevelKillCount >= this.game.killQuota && this.game.enemies.length <= 1 && this.game.warpMessageTimer <= 0) {
-                this.game.nextLevel();
+                // Count collision as a kill for progress
+                if (this.game.socket) {
+                    this.game.socket.emit('enemyKilled', this.id, target.id);
+                } else {
+                    // Single player fallback
+                    this.game.warpLevelKillCount++;
+                    if (this.game.warpLevelKillCount >= this.game.killQuota && this.game.enemies.length <= 1 && this.game.warpMessageTimer <= 0) {
+                        this.game.nextLevel();
+                    }
+                }
+            } else {
+                // If it's a remote player, the host detected they were hit.
+                // We notify the server that the remote player killed the enemy (via collision).
+                // The server will update the remote player's stats and global room progression.
+                if (this.game.socket) {
+                    this.game.socket.emit('enemyKilled', this.id, target.id);
+                    // Notify the remote player that they were hit
+                    this.game.socket.emit('playerHit', { targetId: target.id });
+                }
             }
 
             // Explosion particles (Client-side)
@@ -137,7 +161,11 @@ class Enemy {
 
     // Deprecated for multiplayer readiness
     update(deltaTime) {
-        this.updateState(deltaTime);
+        if (this.game.isHost) {
+            this.updateState(deltaTime);
+        } else {
+            this.updateInterpolation(deltaTime);
+        }
     }
 
     draw(ctx) {
