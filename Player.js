@@ -268,18 +268,19 @@ class Player {
         }
 
         // Calculate the fire direction angle
-        const fireAngle = Math.atan2(this.fireDirection.y, this.fireDirection.x);
+        const fDir = this.fireDirection || { x: 0, y: -1 };
+        const fireAngle = Math.atan2(fDir.y, fDir.x);
 
         // Calculate the angular offset for symmetric placement on circle
         const angleOffset = Math.atan2(arrowWidth, this.radius);
 
         // Position arrow at the circumference of the circle
-        const baseOffsetX = this.x + this.fireDirection.x * this.radius;
-        const baseOffsetY = this.y + this.fireDirection.y * this.radius;
+        const baseOffsetX = this.x + fDir.x * this.radius;
+        const baseOffsetY = this.y + fDir.y * this.radius;
 
         // Calculate arrow point (tip) - extends outward from the circle
-        const tipX = baseOffsetX + this.fireDirection.x * arrowLength;
-        const tipY = baseOffsetY + this.fireDirection.y * arrowLength;
+        const tipX = baseOffsetX + fDir.x * arrowLength;
+        const tipY = baseOffsetY + fDir.y * arrowLength;
 
         // Base corners positioned symmetrically on the circle
         const baseAngle1 = fireAngle + angleOffset;

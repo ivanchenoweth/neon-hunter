@@ -10,16 +10,28 @@ const allowedOrigin = process.env.ALLOWED_ORIGIN || "*";
 const io = new Server(server, { cors: { origin: allowedOrigin } });
 
 const publicDir = process.env.PUBLIC_DIR || path.join(__dirname, '.');
-app.use(express.static(publicDir)); // Serve static files from explicit dir (default: project root)
+app.use(express.static(publicDir));
 
-const players = {};
-let hostId = null;
+// --- ROOMS STATE ---
+const rooms = {};
+// Structure:
+// rooms[roomId] = {
+//   id: roomId,
+//   hostId: socketId,
+//   players: { [socketId]: { ...playerData } },
+//   gameState: { ... } // enemies, foods, world settings
+//   createdAt: timestamp
+// }
 
 const WORLD_WIDTH = 4000;
 const WORLD_HEIGHT = 4000;
 
-function getNextAvailableIndex() {
-  const usedIndices = Object.values(players).map(p => p.index);
+function generateRoomId() {
+  return Math.random().toString(36).substr(2, 6).toUpperCase();
+}
+
+function getNextAvailableIndex(room) {
+  const usedIndices = Object.values(room.players).map(p => p.index);
   let index = 1;
   while (usedIndices.includes(index)) {
     index++;
@@ -27,12 +39,11 @@ function getNextAvailableIndex() {
   return index;
 }
 
-function getRandomSpawnPoint() {
-  const playersArr = Object.values(players);
+function getRandomSpawnPoint(room) {
+  const playersArr = Object.values(room.players);
   let bestPos = { x: 0, y: 0 };
   let maxMinDist = -1;
 
-  // Try 10 random positions and pick the one farthest from the closest player
   for (let i = 0; i < 10; i++) {
     const testPos = {
       x: (Math.random() - 0.5) * (WORLD_WIDTH * 0.8),
@@ -56,133 +67,224 @@ function getRandomSpawnPoint() {
 }
 
 io.on('connection', (socket) => {
-  const index = getNextAvailableIndex();
-  console.log(`Jugador conectado: ${socket.id} (P${index})`);
+  console.log(`User connected: ${socket.id}`);
 
-  // Initial state for the new player with random spawn
-  const spawn = getRandomSpawnPoint();
-  players[socket.id] = {
-    id: socket.id,
-    index: index,
-    x: spawn.x,
-    y: spawn.y,
-    color: '#' + Math.floor(Math.random() * 16777215).toString(16),
-    fireDirection: { x: 0, y: -1 },
-    score: 0,
-    kills: 0,
-    isHost: false
+  // Helpers to get player's room
+  const getRoom = () => {
+    const roomId = socket.roomId;
+    return roomId ? rooms[roomId] : null;
   };
 
-  // If no host, assign this player as host
-  if (!hostId) {
-    hostId = socket.id;
-    players[socket.id].isHost = true;
-    socket.emit('isHost'); // Direct host confirmation
-  }
+  // --- LOBBY EVENTS ---
 
-  // Send the current players and host info to the new player
-  socket.emit('currentPlayers', players);
-  socket.emit('hostAssigned', hostId);
+  socket.on('createRoom', (callback) => {
+    const roomId = generateRoomId();
+    rooms[roomId] = {
+      id: roomId,
+      hostId: socket.id,
+      players: {},
+      // Initialize room-specific game state if needed (mostly handled by host logic currently)
+      createdAt: Date.now()
+    };
 
-  // Notify others about the new player
-  socket.broadcast.emit('newPlayer', players[socket.id]);
+    // Join logic
+    socket.roomId = roomId;
+    socket.join(roomId);
+
+    // Add player to room (Host)
+    const room = rooms[roomId];
+    const index = 1; // Host is always index 1
+    const spawn = { x: 0, y: 0 }; // Host spawns center initially or random
+
+    room.players[socket.id] = {
+      id: socket.id,
+      index: index,
+      x: spawn.x,
+      y: spawn.y,
+      color: '#' + Math.floor(Math.random() * 16777215).toString(16),
+      score: 0,
+      kills: 0,
+      fireDirection: { x: 0, y: -1 },
+      isHost: true
+    };
+
+    console.log(`Room ${roomId} created by ${socket.id}`);
+    if (callback) callback({ success: true, roomId: roomId, isHost: true });
+
+    // Notify client they are host
+    socket.emit('isHost');
+    socket.emit('hostAssigned', socket.id);
+  });
+
+  socket.on('getRooms', (callback) => {
+    const roomList = Object.values(rooms).map(r => ({
+      id: r.id,
+      playerCount: Object.keys(r.players).length,
+      hostId: r.hostId
+    }));
+    if (callback) callback(roomList);
+  });
+
+  socket.on('joinRoom', (roomId, callback) => {
+    const room = rooms[roomId];
+    if (!room) {
+      if (callback) callback({ success: false, message: 'Room not found' });
+      return;
+    }
+
+    socket.roomId = roomId;
+    socket.join(roomId);
+
+    const index = getNextAvailableIndex(room);
+    const spawn = getRandomSpawnPoint(room);
+
+    room.players[socket.id] = {
+      id: socket.id,
+      index: index,
+      x: spawn.x,
+      y: spawn.y,
+      color: '#' + Math.floor(Math.random() * 16777215).toString(16),
+      score: 0,
+      kills: 0,
+      fireDirection: { x: 0, y: -1 },
+      isHost: false
+    };
+
+    console.log(`Player ${socket.id} joined room ${roomId}`);
+
+    // Send success callback
+    if (callback) callback({ success: true, roomId: roomId, isHost: false });
+
+    // Send current room state to new player
+    socket.emit('currentPlayers', room.players);
+    socket.emit('hostAssigned', room.hostId);
+
+    // Notify others in room
+    socket.to(roomId).emit('newPlayer', room.players[socket.id]);
+  });
+
+
+  // --- GAME EVENTS (Scoped to Room) ---
 
   socket.on('playerMove', (movementData) => {
-    if (players[socket.id]) {
-      players[socket.id].x = movementData.x;
-      players[socket.id].y = movementData.y;
-      players[socket.id].fireDirection = movementData.fireDirection;
-      // Relay to others
-      socket.broadcast.emit('playerMoved', { id: socket.id, ...movementData });
+    const room = getRoom();
+    if (!room || !room.players[socket.id]) return;
+
+    const p = room.players[socket.id];
+    p.x = movementData.x;
+    p.y = movementData.y;
+    p.fireDirection = movementData.fireDirection;
+    p.cameraX = movementData.cameraX;
+    p.cameraY = movementData.cameraY;
+    p.viewW = movementData.viewW;
+    p.viewH = movementData.viewH;
+
+    socket.to(room.id).emit('playerMoved', { id: socket.id, ...movementData });
+  });
+
+  socket.on('playerShoot', (shootData) => {
+    const room = getRoom();
+    if (room) {
+      socket.to(room.id).emit('playerFired', { id: socket.id, ...shootData });
     }
   });
 
   socket.on('updateStats', (stats) => {
-    if (players[socket.id]) {
-      players[socket.id].score = stats.score;
-      players[socket.id].kills = stats.kills;
-      socket.broadcast.emit('statsUpdated', { id: socket.id, ...stats });
+    const room = getRoom();
+    if (room && room.players[socket.id]) {
+      room.players[socket.id].score = stats.score;
+      room.players[socket.id].kills = stats.kills;
+      socket.to(room.id).emit('statsUpdated', { id: socket.id, ...stats });
     }
   });
 
-  // Host-specific events
+  // Host-only events need to verify socket.id === room.hostId
   socket.on('enemySpawned', (enemyData) => {
-    if (socket.id === hostId) {
-      socket.broadcast.emit('enemySpawned', enemyData);
+    const room = getRoom();
+    if (room && socket.id === room.hostId) {
+      socket.to(room.id).emit('enemySpawned', enemyData);
     }
   });
 
   socket.on('foodSpawned', (foodData) => {
-    if (socket.id === hostId) {
-      socket.broadcast.emit('foodSpawned', foodData);
+    const room = getRoom();
+    if (room && socket.id === room.hostId) {
+      socket.to(room.id).emit('foodSpawned', foodData);
     }
   });
 
   socket.on('syncEnemies', (enemiesData) => {
-    if (socket.id === hostId) {
-      socket.broadcast.emit('syncEnemies', enemiesData);
+    const room = getRoom();
+    if (room && socket.id === room.hostId) {
+      socket.to(room.id).emit('syncEnemies', enemiesData);
     }
-  });
-
-  socket.on('pauseGame', () => {
-    if (socket.id === hostId) {
-      socket.broadcast.emit('gamePaused');
-    }
-  });
-
-  socket.on('resumeGame', () => {
-    if (socket.id === hostId) {
-      socket.broadcast.emit('gameResumed');
-    }
-  });
-
-  socket.on('playerShoot', (shootData) => {
-    socket.broadcast.emit('playerFired', { id: socket.id, ...shootData });
-  });
-
-  socket.on('enemyKilled', (enemyId) => {
-    socket.broadcast.emit('enemyDestroyed', enemyId);
   });
 
   socket.on('spawnAreaUpdated', (spawnAreaData) => {
-    if (socket.id === hostId) {
-      socket.broadcast.emit('spawnAreaUpdated', spawnAreaData);
+    const room = getRoom();
+    if (room && socket.id === room.hostId) {
+      socket.to(room.id).emit('spawnAreaUpdated', spawnAreaData);
+    }
+  });
+
+  // Shared events
+  socket.on('enemyKilled', (enemyId) => {
+    const room = getRoom();
+    if (room) {
+      socket.to(room.id).emit('enemyDestroyed', enemyId);
     }
   });
 
   socket.on('foodCollected', (foodId) => {
-    socket.broadcast.emit('foodCollected', foodId);
+    const room = getRoom();
+    if (room) {
+      socket.to(room.id).emit('foodCollected', foodId);
+    }
   });
 
   socket.on('requestWorldState', () => {
-    if (hostId && hostId !== socket.id) {
-      io.to(hostId).emit('requestWorldState', socket.id);
+    const room = getRoom();
+    if (room && room.hostId && room.hostId !== socket.id) {
+      // Ask the host of THIS room for state
+      io.to(room.hostId).emit('requestWorldState', socket.id);
     }
   });
 
   socket.on('worldState', (data) => {
-    // Relay world state from host to the specific player who requested it
+    // Host replies with state, send to specific target
     if (data.to) {
       io.to(data.to).emit('worldState', data.state);
     }
   });
 
   socket.on('disconnect', () => {
-    const player = players[socket.id];
-    console.log(`Jugador desconectado: ${socket.id} (P${player ? player.index : '?'})`);
-    const wasHost = (socket.id === hostId);
-    delete players[socket.id];
+    const room = getRoom();
+    if (room) {
+      console.log(`Player ${socket.id} left room ${room.id}`);
+      const wasHost = (socket.id === room.hostId);
 
-    if (wasHost) {
-      hostId = Object.keys(players)[0] || null;
-      if (hostId) {
-        players[hostId].isHost = true;
-        io.emit('hostAssigned', hostId);
-        io.to(hostId).emit('isHost'); // Notify the new host
+      // Remove player
+      delete room.players[socket.id];
+
+      // Notify others
+      io.to(room.id).emit('playerDisconnected', socket.id);
+
+      if (Object.keys(room.players).length === 0) {
+        // Empty room, delete it
+        console.log(`Deleting empty room ${room.id}`);
+        delete rooms[room.id];
+      } else if (wasHost) {
+        // Host left, assign new host
+        const newHostId = Object.keys(room.players)[0];
+        room.hostId = newHostId;
+        if (room.players[newHostId]) {
+          room.players[newHostId].isHost = true;
+        }
+        io.to(room.id).emit('hostAssigned', newHostId);
+        io.to(newHostId).emit('isHost');
+        console.log(`New host for room ${room.id} is ${newHostId}`);
       }
     }
-
-    io.emit('playerDisconnected', socket.id);
   });
 });
 
@@ -191,23 +293,16 @@ const serverInstance = server.listen(PORT, () => {
   console.log(`🎮 Neon Hunter server en puerto ${PORT}`);
 });
 
-// Graceful shutdown
 function shutdown(signal) {
   console.log(`Received ${signal}. Closing server...`);
   serverInstance.close(() => {
     io.close();
-    console.log('Server closed. Exiting.');
     process.exit(0);
   });
-  // Force exit if not closed after timeout
-  setTimeout(() => {
-    console.error('Forcing shutdown.');
-    process.exit(1);
-  }, 10000);
+  setTimeout(() => process.exit(1), 10000);
 }
 
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 
-// Export server and io for testing or external control
 module.exports = { server: serverInstance, io };

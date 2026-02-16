@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Test Host</title>
+</head>
+<body>
+    <h1>Test Host Running...</h1>
+    <div id="status">Connecting...</div>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const statusDiv = document.getElementById('status');
+
+        socket.on('connect', () => {
+            console.log('Test Host Connected');
+            statusDiv.innerText = 'Connected. Creating room...';
+            
+            socket.emit('createRoom', (response) => {
+                if (response.success) {
+                    console.log('Room Created:', response.roomId);
+                    statusDiv.innerText = 'Room Created: ' + response.roomId;
+                    document.title = 'Test Host - ' + response.roomId;
+                } else {
+                    console.error('Failed to create room:', response);
+                    statusDiv.innerText = 'Failed to create room';
+                }
+            });
+        });
+    </script>
+</body>
+</html>

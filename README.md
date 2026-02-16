@@ -40,12 +40,12 @@ Enemies in Neon Hunter exhibit specific behaviors designed to challenge the play
 - **Aggressive Chasing**: Enemies constantly calculate the vector towards the player and move at a speed relative to the player's (up to 120% of the player's nominal speed, with a maximum of 180 units/sec) to intercept them.
 - **Social Separation**: They implement a separation algorithm. If they get too close to each other, they apply a "push" force to avoid overlapping, creating a "swarming" effect rather than stacking.
 - **Dynamic Spawning**:
-    - They spawn at a safe distance from the player (between 600 and 1000 units).
-    - The spawner ensures they appear near the current camera view but not directly on top of the player.
-    - If an enemy goes too far off-screen, it is automatically recycled and repositioned near the player's current view.
+  - They spawn at a safe distance from the player (between 600 and 1000 units).
+  - The spawner ensures they appear near the current camera view but not directly on top of the player.
+  - If an enemy goes too far off-screen, it is automatically recycled and repositioned near the player's current view.
 - **Combat & Effects**:
-    - On collision with the player, the enemy is destroyed, the player takes damage, and a camera shake effect is triggered.
-    - When shot by a bullet, they explode into multiple neon particles and grant points.
+  - On collision with the player, the enemy is destroyed, the player takes damage, and a camera shake effect is triggered.
+  - When shot by a bullet, they explode into multiple neon particles and grant points.
 
 ---
 
@@ -70,12 +70,14 @@ The `game.js` file includes hooks prepared for networking:
 
 You can test the game in your local browser without using the `npm run start` script:
 
-- **Option A — Open directly (simple):** Open `index.html` with your browser (`file://` path). *Note:* some browsers may restrict modules or requests for security; if you see errors in the console, use Option B.
+- **Option A — Open directly (simple):** Open `index.html` with your browser (`file://` path). _Note:_ some browsers may restrict modules or requests for security; if you see errors in the console, use Option B.
 
 - **Option B — Quick static server (recommended):** If you have Python installed, run this in the project root:
+
   ```bash
   python3 -m http.server 8000
   ```
+
   then open `http://localhost:8000` in your browser.
 
 - **Option C — Serve with Node.js without using `npm run start`:** If you prefer using Node.js without running an `npm` script, you can use `npx` to run a temporary server:
@@ -95,21 +97,26 @@ The project includes `server.js` for multiplayer mode using Express + Socket.IO.
    ```
    This will install `express` and `socket.io` as listed in `package.json`.
 3. Start the server with Node (without `npm run start`):
+
    ```bash
    node server.js
    ```
+
    By default, it listens on `http://localhost:3000`, but it can also read the `PORT` environment variable. For example:
+
    ```bash
    PORT=4000 node server.js
    ```
+
    (In Windows PowerShell use: `$env:PORT=4000; node server.js`.)
 
    There is also a convenient npm script included in `package.json`:
+
    ```bash
    npm run start:port
    ```
-   **Recommended (portable):** This script starts the server on port `4000` by default if `PORT` is not defined, using a small Node wrapper that works on all platforms.
 
+   **Recommended (portable):** This script starts the server on port `4000` by default if `PORT` is not defined, using a small Node wrapper that works on all platforms.
    - To use another port, define the `PORT` variable before running the script:
      - Linux/macOS:
        ```bash
@@ -122,7 +129,7 @@ The project includes `server.js` for multiplayer mode using Express + Socket.IO.
 
    Note: `cross-env` was kept in `devDependencies` as an alternative option if preferred.
 
-4. Open `http://localhost:3000` (or `http://localhost:<PORT>` if you used another configuration) in one or more browsers/devices to test multiplayer. The default server allows connections from any origin (CORS: "*") to facilitate local testing; in production, you should restrict `ALLOWED_ORIGIN`:
+4. Open `http://localhost:3000` (or `http://localhost:<PORT>` if you used another configuration) in one or more browsers/devices to test multiplayer. The default server allows connections from any origin (CORS: "\*") to facilitate local testing; in production, you should restrict `ALLOWED_ORIGIN`:
 
 ```bash
 ALLOWED_ORIGIN=https://example.com PORT=4000 node server.js
@@ -154,6 +161,19 @@ The server handles `SIGINT` and `SIGTERM` signals and performs a graceful shutdo
 - To keep the server running in the background on Linux, consider `nohup node server.js &` or using `pm2`.
 
 ---
+
+🚀 NUEVAS FUNCIONES ACTIVAS:
+⌘ + L → Chat DeepSeek
+/@ → Comandos: /Laravel /Moodle /Debug
+
+@workspace → Analiza _.php, _.js, package.json AUTOMÁTICO
+MAGIA para tu stack:
+text
+
+1. Abrir proyecto Laravel/Moodle
+2. ⌘ + L → "@workspace Escribe auth Moodle"
+3. ¡DeepSeek VE todo tu proyecto! ⭐
+   ¡Configuración PRO definitiva! DeepSeek + análisis automático PHP/JS + comandos personalizados para tu trabajo educativo. 🎯
 
 game.toggleDebug()
 

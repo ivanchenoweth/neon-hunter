@@ -6,6 +6,7 @@ class Bullet {
         this.speed = 600;
         this.radius = 1.5;
         this.color = shooter ? shooter.color : '#ffff00';
+        this.shooterId = shooter ? shooter.id : (game.player ? game.player.id : null);
         this.markedForDeletion = false;
 
         // Use shooter's fire direction or calculate from target
@@ -69,6 +70,7 @@ class Bullet {
         this.speed = 600;
         this.markedForDeletion = false;
         this.color = shooter ? shooter.color : '#ffff00';
+        this.shooterId = shooter ? shooter.id : (game.player ? game.player.id : null);
 
         if (shooter) {
             this.dx = shooter.fireDirection.x;
