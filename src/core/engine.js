@@ -31,6 +31,7 @@ export class Engine {
         this.framesSinceUpdate = 0;
 
         this.setupCanvas();
+        this.config = CONFIG;
         window.addEventListener('resize', () => this.handleResize());
     }
 
@@ -114,36 +115,6 @@ export class Engine {
 
         if (this.camera) {
             this.camera.update(deltaTime);
-        }
-
-        this.checkWarpProgression();
-    }
-
-    checkWarpProgression() {
-        if (this.warpLevelKillCount >= CONFIG.KILL_QUOTA) {
-            this.warpLevel++;
-            this.warpLevelKillCount = 0;
-
-            // Teleport player to a new random position to "change spawn position"
-            if (this.player) {
-                this.player.x = (Math.random() - 0.5) * (CONFIG.WORLD_WIDTH * 0.7);
-                this.player.y = (Math.random() - 0.5) * (CONFIG.WORLD_HEIGHT * 0.7);
-                if (this.camera) this.camera.snapTo(this.player);
-            }
-
-            // Reset warp timer so escalation starts over
-            this.warpTimer = 0;
-
-            // Properly clear all enemies on warp so they return to the pool
-            this.entityManager.getEntitiesByType('enemy').forEach(e => {
-                e.active = false;
-            });
-            this.entityManager.cleanup();
-
-            // Notify systems of warp change (SpawnSystem resets its counter here)
-            for (const system of this.systemManager.logicSystems) {
-                if (system.onWarp) system.onWarp(this.warpLevel);
-            }
         }
     }
 

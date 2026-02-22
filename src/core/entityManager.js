@@ -1,7 +1,15 @@
 export class EntityManager {
     constructor() {
         this.entities = [];
+        this.entitiesByType = new Map(); // Fast lookup categorized by type
         this.pools = new Map();
+    }
+
+    _getGroup(type) {
+        if (!this.entitiesByType.has(type)) {
+            this.entitiesByType.set(type, []);
+        }
+        return this.entitiesByType.get(type);
     }
 
     registerPool(type, factory, initialSize = 20) {
@@ -16,6 +24,7 @@ export class EntityManager {
         }
 
         this.pools.set(type, pool);
+        this.entitiesByType.set(type, []);
     }
 
     get(type, x, y, ...args) {
@@ -34,8 +43,12 @@ export class EntityManager {
 
         entity.init(x, y, ...args);
         entity.type = type;
+        entity.active = true;
+        entity.isMarkedForRemoval = false;
+
         pool.busy.push(entity);
         this.entities.push(entity);
+        this._getGroup(type).push(entity);
 
         return entity;
     }
@@ -55,21 +68,31 @@ export class EntityManager {
         const type = entity.type;
         const pool = this.pools.get(type);
         if (pool) {
-            const index = pool.busy.indexOf(entity);
-            if (index !== -1) {
-                pool.busy.splice(index, 1);
+            // Remove from categorized list
+            const group = this.entitiesByType.get(type);
+            if (group) {
+                const gIdx = group.indexOf(entity);
+                if (gIdx !== -1) group.splice(gIdx, 1);
             }
+
+            // Remove from busy pool
+            const bIdx = pool.busy.indexOf(entity);
+            if (bIdx !== -1) pool.busy.splice(bIdx, 1);
+
             entity.reset();
             pool.available.push(entity);
         }
     }
 
     getEntitiesByType(type) {
-        return this.entities.filter(e => e.type === type);
+        return this.entitiesByType.get(type) || [];
     }
 
     clear() {
-        this.entities.forEach(entity => this.release(entity));
+        // Create a copy to avoid mutation issues during release
+        const all = [...this.entities];
+        all.forEach(entity => this.release(entity));
         this.entities = [];
+        this.entitiesByType.forEach(arr => arr.length = 0);
     }
 }

@@ -1,3 +1,5 @@
+import { CONFIG } from '../config/constants.js?v=29';
+
 export class Camera {
     constructor(width, height, zoom = 1) {
         this.x = 0;
@@ -15,34 +17,34 @@ export class Camera {
     }
 
     update(deltaTime) {
-        if (this.target) {
-            let targetX = this.target.x - (this.width / 2) / this.zoom;
-            let targetY = this.target.y - (this.height / 2) / this.zoom;
+        if (!this.target) return;
 
-            // Clamp target to world boundaries
-            const halfW = 4000 / 2; // WORLD_WIDTH
-            const halfH = 4000 / 2; // WORLD_HEIGHT
-            const viewW = (this.width / this.zoom);
-            const viewH = (this.height / this.zoom);
+        // Ideal target position (centered)
+        let targetX = this.target.x - (this.width / 2) / this.zoom;
+        let targetY = this.target.y - (this.height / 2) / this.zoom;
 
-            const minX = -halfW;
-            const maxX = halfW - viewW;
-            const minY = -halfH;
-            const maxY = halfH - viewH;
+        // Clamp target to world boundaries
+        const halfW = CONFIG.WORLD_WIDTH / 2;
+        const halfH = CONFIG.WORLD_HEIGHT / 2;
+        const viewW = this.width / this.zoom;
+        const viewH = this.height / this.zoom;
 
-            targetX = Math.max(minX, Math.min(maxX, targetX));
-            targetY = Math.max(minY, Math.min(maxY, targetY));
+        const minX = -halfW;
+        const maxX = halfW - viewW;
+        const minY = -halfH;
+        const maxY = halfH - viewH;
 
-            // Smoothly interpolate to target (Lerp - Framerate Independent)
-            // A higher smoothing factor means a tighter follow. 
-            // 0.08 was the original value at ~60fps (16.6ms).
-            const smoothing = 0.12;
-            const lerpFactor = 1 - Math.pow(1 - smoothing, deltaTime / 16.6);
+        targetX = Math.max(minX, Math.min(maxX, targetX));
+        targetY = Math.max(minY, Math.min(maxY, targetY));
 
-            this.x += (targetX - this.x) * lerpFactor;
-            this.y += (targetY - this.y) * lerpFactor;
-        }
+        // Smoothly interpolate to target (Lerp - Framerate Independent)
+        const smoothing = 0.12;
+        const lerpFactor = 1 - Math.pow(1 - smoothing, deltaTime / 16.6);
 
+        this.x += (targetX - this.x) * lerpFactor;
+        this.y += (targetY - this.y) * lerpFactor;
+
+        // Shake logic
         if (this.shakeDuration > 0) {
             this.shakeDuration -= deltaTime;
             if (this.shakeDuration <= 0) {
@@ -56,11 +58,11 @@ export class Camera {
             this.x = target.x - (this.width / 2) / this.zoom;
             this.y = target.y - (this.height / 2) / this.zoom;
 
-            // Clamp (using hardcoded 4000 for now as it's consistent in this file)
-            const halfW = 2000;
-            const halfH = 2000;
-            const viewW = (this.width / this.zoom);
-            const viewH = (this.height / this.zoom);
+            const halfW = CONFIG.WORLD_WIDTH / 2;
+            const halfH = CONFIG.WORLD_HEIGHT / 2;
+            const viewW = this.width / this.zoom;
+            const viewH = this.height / this.zoom;
+
             this.x = Math.max(-halfW, Math.min(halfW - viewW, this.x));
             this.y = Math.max(-halfH, Math.min(halfH - viewH, this.y));
         }

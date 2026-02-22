@@ -10,6 +10,8 @@ import { StateSystem } from './systems/stateSystem.js?v=29';
 import { EffectSystem } from './systems/effectSystem.js?v=29';
 import { PlayerSystem } from './systems/playerSystem.js?v=29';
 import { EnemySystem } from './systems/enemySystem.js?v=29';
+import { ProgressionSystem } from './systems/progressionSystem.js?v=29';
+import { ActionSystem } from './systems/actionSystem.js?v=29';
 
 // Entities
 import { Player } from './entities/player.js?v=29';
@@ -22,7 +24,7 @@ function initGame() {
     window.zoomLevel = 1.0;
     const canvas = document.getElementById('gameCanvas');
     const engine = new Engine(canvas);
-    
+
     // Initialize Camera
     engine.camera = new Camera(engine.width, engine.height);
 
@@ -41,14 +43,15 @@ function initGame() {
     engine.audioSystem = audioSystem; // Globally accessible
     const effectSystem = new EffectSystem();
     const renderSystem = new RenderSystem(canvas, engine.camera);
-    
+
     // LOGIC Phase Order
-    engine.systemManager.addSystem(inputSystem, 'logic');
+    engine.systemManager.addSystem(new ActionSystem(), 'logic');
     engine.systemManager.addSystem(stateSystem, 'logic'); // Transition state next
     engine.systemManager.addSystem(new PlayerSystem(), 'logic');
     engine.systemManager.addSystem(new EnemySystem(), 'logic');
     engine.systemManager.addSystem(new SpawnSystem(), 'logic');
     engine.systemManager.addSystem(new MovementSystem(), 'logic');
+    engine.systemManager.addSystem(new ProgressionSystem(engine), 'logic');
     engine.systemManager.addSystem(new CollisionSystem(), 'logic');
     engine.systemManager.addSystem(effectSystem, 'logic');
     engine.systemManager.addSystem(audioSystem, 'logic');
@@ -56,9 +59,9 @@ function initGame() {
     // RENDER Phase Order
     engine.systemManager.addSystem(renderSystem, 'render'); // Draws world first
     engine.systemManager.addSystem(stateSystem, 'render');  // Draws HUD/Menu on top
-    
+
     window.gameEngine = engine;
-    
+
     // Global click to resume audio
     document.addEventListener('click', () => {
         if (audioSystem.ctx.state === 'suspended') {
