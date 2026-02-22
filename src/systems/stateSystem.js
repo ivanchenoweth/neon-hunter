@@ -6,7 +6,7 @@ export class StateSystem {
         this.currentState = GAME_STATES.INITIAL;
         this.menuSelection = 2; // Default to 'Touch' (index 2)
         this.updateDuringPause = true;
-        
+
         this.btnBounds = {
             restart: { x: 0, y: 0, w: 200, h: 60 },
             mainMenu: { x: 0, y: 0, w: 200, h: 60 },
@@ -55,7 +55,7 @@ export class StateSystem {
         // Menu navigation cooldown
         if (this.menuCooldown === undefined) this.menuCooldown = 0;
         if (this.menuCooldown > 0) this.menuCooldown -= deltaTime;
-        
+
         // Handle Clicks
         if (input.clicks && input.clicks.length > 0) {
             const rect = this.engine.canvas.getBoundingClientRect();
@@ -108,9 +108,9 @@ export class StateSystem {
                 this.gameOverSelection = 1;
                 this.menuCooldown = 200;
             }
-            
+
             if (input.keys.enter) {
-                input.keys.enter = false; 
+                input.keys.enter = false;
                 this.menuCooldown = 500;
                 if (this.gameOverSelection === 0) {
                     this.startGame();
@@ -223,7 +223,7 @@ export class StateSystem {
             const modeMap = { 2: 'touch', 3: 'keyboard', 4: 'keyboardFire' };
             const colorMap = { 2: '#00ff88', 3: '#00d4ff', 4: '#ff00ff' };
             const boundsMap = { 2: this.btnBounds.modeTouch, 3: this.btnBounds.modeKeyboard, 4: this.btnBounds.modeKeyboardFire };
-            
+
             window.inputMode = modeMap[this.menuSelection];
             window.dispatchEvent(new Event('inputModeChanged'));
 
@@ -250,7 +250,7 @@ export class StateSystem {
         if (worldState.audioSystem) worldState.audioSystem.playExplosion();
         let worldX = screenX;
         let worldY = screenY;
-        
+
         if (isScreenCoord && this.engine.camera) {
             worldX = (screenX / this.engine.camera.zoom) + this.engine.camera.x;
             worldY = (screenY / this.engine.camera.zoom) + this.engine.camera.y;
@@ -274,11 +274,15 @@ export class StateSystem {
         this.currentState = GAME_STATES.GAME_OVER;
         this.engine.gameState = GAME_STATES.GAME_OVER;
         this.gameOverInitialized = false;
+
+        if (this.engine.audioSystem) {
+            this.engine.audioSystem.stopLaserCharge();
+        }
     }
 
     render(worldState) {
         const { ctx, width, height } = worldState;
-        
+
         if (this.currentState === GAME_STATES.INITIAL) {
             this.drawStartScreen(ctx, width, height);
         } else if (this.currentState === GAME_STATES.PAUSED) {
@@ -286,7 +290,7 @@ export class StateSystem {
         } else if (this.currentState === GAME_STATES.GAME_OVER) {
             this.drawGameOverScreen(ctx, width, height);
         }
-        
+
         if (this.currentState === GAME_STATES.PLAYING) {
             this.drawMinimap(ctx, worldState);
             this.drawHUD(ctx, worldState);
@@ -353,7 +357,7 @@ export class StateSystem {
         bKeyboard.w = btnW; bKeyboard.h = btnH;
         bKeyboard.x = cx - btnW / 2; bKeyboard.y = cy + spacing;
         this.drawButton(ctx, bKeyboard, 'WASD + Mouse', '#00d4ff', this.menuSelection === 3, buttonTextSize);
-        
+
         const bKeyboardFire = this.btnBounds.modeKeyboardFire;
         bKeyboardFire.w = btnW; bKeyboardFire.h = btnH;
         bKeyboardFire.x = cx - btnW / 2; bKeyboardFire.y = cy + 2 * spacing;
@@ -462,26 +466,28 @@ export class StateSystem {
         ctx.font = 'bold 18px Outfit';
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
-        
+
         ctx.fillText(`Score: ${engine.score}`, 20, 20);
         ctx.fillText(`Coins: ${engine.coins}`, 20, 45);
-        
+
         if (engine.player) {
             ctx.fillText(`Kills: ${engine.enemiesDestroyed}`, 20, 70);
-            
+
             // Speeds
             const playerSpeed = Math.round(engine.player.speed);
             // Get average or representative enemy speed if exists
             const enemies = engine.entityManager.getEntitiesByType('enemy');
             const enemySpeed = enemies.length > 0 ? Math.round(enemies[0].speed) : CONFIG.ENEMY_BASE_SPEED;
-            
+
             ctx.fillText(`P-Base Speed: ${playerSpeed}`, 20, 95);
             ctx.fillText(`E-Base Speed: ${enemySpeed}`, 20, 120);
+            ctx.fillText(`Shot Cadence: ${CONFIG.PLAYER_SHOT_INTERVAL}ms`, 20, 145);
+            ctx.fillText(`Combo: ${engine.player.foodCombo}/5`, 20, 170);
 
             // Vector Hearts for Lives
             const heartSize = 18;
             const startX = 25;
-            const startY = 160;
+            const startY = 210;
             for (let i = 0; i < engine.player.lives; i++) {
                 this.drawHeart(ctx, startX + i * 30, startY, heartSize);
             }
@@ -491,7 +497,7 @@ export class StateSystem {
         ctx.fillStyle = '#00ff88';
         ctx.font = 'bold 18px Outfit';
         ctx.textAlign = 'left';
-        ctx.fillText(`FPS: ${engine.fps}`, 150, 20); 
+        ctx.fillText(`FPS: ${engine.fps}`, 150, 20);
         ctx.textAlign = 'left';
 
         // Warp Level (Center Top)
@@ -508,8 +514,8 @@ export class StateSystem {
         const by = 70;
         ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
         ctx.fillRect(bx, by, barW, barH);
-        
-        const killsToNext = 100; 
+
+        const killsToNext = CONFIG.KILL_QUOTA;
         const progress = Math.min(1, engine.warpLevelKillCount / killsToNext);
         ctx.fillStyle = CONFIG.COLORS.PLAYER;
         ctx.fillRect(bx, by, barW * progress, barH);
@@ -554,11 +560,11 @@ export class StateSystem {
             if (!entity.active) continue;
             const ex = center + entity.x * scale;
             const ey = center + entity.y * scale;
-            
+
             if (entity.type === 'player') {
                 ctx.fillStyle = '#fff';
                 ctx.fillRect(ex - 2, ey - 2, 4, 4);
-                
+
                 // Draw Laser Beam on minimap
                 if (entity.isChargingBeam && entity.beamLength > 0) {
                     ctx.strokeStyle = '#fff';
@@ -567,7 +573,7 @@ export class StateSystem {
                     ctx.moveTo(ex, ey);
                     ctx.lineTo(ex + entity.fireDirection.x * entity.beamLength * scale, ey + entity.fireDirection.y * entity.beamLength * scale);
                     ctx.stroke();
-                    
+
                     ctx.strokeStyle = '#ff00ff';
                     ctx.lineWidth = 1;
                     ctx.stroke();
@@ -580,7 +586,7 @@ export class StateSystem {
                 ctx.fillRect(ex - 1, ey - 1, 2, 2);
             }
         }
-        
+
         // Viewport and Spawn Area Indicators
         if (engine.camera) {
             const camW = worldState.width / engine.camera.zoom;
@@ -603,7 +609,7 @@ export class StateSystem {
             ctx.strokeRect(vx - margin, vy - margin, vw + 2 * margin, vh + 2 * margin);
             ctx.setLineDash([]);
         }
-        
+
         ctx.restore();
     }
 
@@ -615,24 +621,24 @@ export class StateSystem {
         ctx.moveTo(x, y + topCurveHeight);
         // Left side of heart
         ctx.bezierCurveTo(
-            x, y, 
-            x - size / 2, y, 
+            x, y,
+            x - size / 2, y,
             x - size / 2, y + topCurveHeight
         );
         ctx.bezierCurveTo(
-            x - size / 2, y + (size + topCurveHeight) / 2, 
-            x, y + (size + topCurveHeight) / 2, 
+            x - size / 2, y + (size + topCurveHeight) / 2,
+            x, y + (size + topCurveHeight) / 2,
             x, y + size
         );
         // Right side of heart
         ctx.bezierCurveTo(
-            x, y + (size + topCurveHeight) / 2, 
-            x + size / 2, y + (size + topCurveHeight) / 2, 
+            x, y + (size + topCurveHeight) / 2,
+            x + size / 2, y + (size + topCurveHeight) / 2,
             x + size / 2, y + topCurveHeight
         );
         ctx.bezierCurveTo(
-            x + size / 2, y, 
-            x, y, 
+            x + size / 2, y,
+            x, y,
             x, y + topCurveHeight
         );
         ctx.closePath();

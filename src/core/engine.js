@@ -13,7 +13,8 @@ export class Engine {
         this.systemManager = new SystemManager();
 
         this.lastTime = 0;
-        this.frameInterval = 1000 / CONFIG.FPS_LIMIT;
+        this.accumulator = 0;
+        this.fixedDeltaTime = 1000 / 60; // 60 FPS fixed simulation rate
 
         // Global State
         this.gameState = 'INITIAL';
@@ -23,7 +24,7 @@ export class Engine {
         this.warpLevel = 1;
         this.warpLevelKillCount = 0;
         this.warpTimer = 0;
-        
+
         // FPS Tracking
         this.fps = 0;
         this.lastFpsUpdate = 0;
@@ -60,28 +61,30 @@ export class Engine {
 
     loop(currentTime) {
         try {
-            const deltaTime = currentTime - this.lastTime;
-            
-            if (deltaTime >= this.frameInterval) {
-                this.lastTime = currentTime - (deltaTime % this.frameInterval);
-                
-                this.update(deltaTime);
-                this.render();
+            const frameTime = currentTime - this.lastTime;
+            this.lastTime = currentTime;
 
-                // FPS Calculation
-                this.framesSinceUpdate++;
-                if (currentTime - this.lastFpsUpdate >= 1000) {
-                    this.fps = Math.round((this.framesSinceUpdate * 1000) / (currentTime - this.lastFpsUpdate));
-                    this.lastFpsUpdate = currentTime;
-                    this.framesSinceUpdate = 0;
-                }
+            // Cap frame time to prevent "spiral of death" during heavy lag
+            this.accumulator += Math.min(frameTime, 250);
+
+            while (this.accumulator >= this.fixedDeltaTime) {
+                this.update(this.fixedDeltaTime);
+                this.accumulator -= this.fixedDeltaTime;
             }
-            
+
+            this.render();
+
+            // FPS Calculation
+            this.framesSinceUpdate++;
+            if (currentTime - this.lastFpsUpdate >= 1000) {
+                this.fps = Math.round((this.framesSinceUpdate * 1000) / (currentTime - this.lastFpsUpdate));
+                this.lastFpsUpdate = currentTime;
+                this.framesSinceUpdate = 0;
+            }
+
             requestAnimationFrame((t) => this.loop(t));
         } catch (error) {
             console.error('[Engine] CRITICAL LOOP ERROR:', error);
-            // Don't restart requestAnimationFrame here to avoid infinite error logs
-            // unless the user reloads.
         }
     }
 
@@ -89,7 +92,7 @@ export class Engine {
         if (this.gameState === 'PLAYING') {
             this.warpTimer += deltaTime;
         }
-        
+
         // Collect information for systems
         const worldState = {
             width: this.width,
@@ -117,11 +120,27 @@ export class Engine {
     }
 
     checkWarpProgression() {
-        if (this.warpLevelKillCount >= 100) {
+        if (this.warpLevelKillCount >= CONFIG.KILL_QUOTA) {
             this.warpLevel++;
             this.warpLevelKillCount = 0;
-            
-            // Notify systems of warp change
+
+            // Teleport player to a new random position to "change spawn position"
+            if (this.player) {
+                this.player.x = (Math.random() - 0.5) * (CONFIG.WORLD_WIDTH * 0.7);
+                this.player.y = (Math.random() - 0.5) * (CONFIG.WORLD_HEIGHT * 0.7);
+                if (this.camera) this.camera.snapTo(this.player);
+            }
+
+            // Reset warp timer so escalation starts over
+            this.warpTimer = 0;
+
+            // Properly clear all enemies on warp so they return to the pool
+            this.entityManager.getEntitiesByType('enemy').forEach(e => {
+                e.active = false;
+            });
+            this.entityManager.cleanup();
+
+            // Notify systems of warp change (SpawnSystem resets its counter here)
             for (const system of this.systemManager.logicSystems) {
                 if (system.onWarp) system.onWarp(this.warpLevel);
             }

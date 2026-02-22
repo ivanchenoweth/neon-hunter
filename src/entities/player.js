@@ -7,24 +7,25 @@ export class Player extends Entity {
         this.radius = 10;
         this.color = CONFIG.COLORS.PLAYER;
         this.speed = CONFIG.PLAYER_BASE_SPEED;
-        
+
         this.fireDirection = { x: 0, y: -1 };
         this.arrowBlinkTimer = 0;
-        
+
         this.spawnDuration = 2000;
         this.spawnTimer = this.spawnDuration;
-        
+
         this.collisionAlpha = 1.0;
         this.collisionEffectTimer = 0;
-        
+
         this.lives = CONFIG.PLAYER_LIVES;
-        
+        this.foodCombo = 0;
+
         // Beam System
         this.isChargingBeam = false;
         this.beamChargeTime = 0;
         this.maxBeamChargeTime = 1500;
         this.beamLength = 0;
-        
+
         this.type = 'player';
     }
 
@@ -36,15 +37,15 @@ export class Player extends Entity {
     }
 
     takeDamage(amount, worldState) {
-        if (this.spawnTimer > 0) return; // Invulnerable during spawn
-        
+        if (this.spawnTimer > 0 || this.collisionEffectTimer > 0) return; // Invulnerable during spawn or blink
+
         this.lives -= amount;
-        this.collisionEffectTimer = 4000;
-        
+        this.collisionEffectTimer = 3000; // 3 seconds of invulnerability
+
         if (worldState.audioSystem) {
             worldState.audioSystem.playDamage();
         }
-        
+
         if (worldState.engine && worldState.engine.camera) {
             worldState.engine.camera.shake(20, 300);
         }
@@ -63,8 +64,19 @@ export class Player extends Entity {
             worldState.engine.score += 10;
             worldState.engine.coins += 1;
         }
+
+        this.foodCombo++;
+
         if (worldState.audioSystem) {
-            worldState.audioSystem.playCollect();
+            worldState.audioSystem.playCollect(this.foodCombo);
+        }
+
+        if (this.foodCombo >= 5) {
+            this.lives++;
+            this.foodCombo = 0;
+            if (worldState.audioSystem) {
+                worldState.audioSystem.playExtraLife();
+            }
         }
     }
 
@@ -89,7 +101,7 @@ export class Player extends Entity {
         } else {
             ctx.globalAlpha = this.collisionAlpha;
             if (this.collisionEffectTimer > 0) {
-                const timePassed = 4000 - this.collisionEffectTimer;
+                const timePassed = 3000 - this.collisionEffectTimer;
                 const phase = timePassed * (0.012 + 0.0000025 * timePassed);
                 if (Math.floor(phase) % 2 === 0) {
                     ctx.globalAlpha = 0;
@@ -123,7 +135,7 @@ export class Player extends Entity {
     drawArrow(ctx) {
         const arrowLength = this.radius * 0.45;
         const arrowWidth = this.radius * 1.15;
-        
+
         let arrowColor = '#ff00ff';
         if (this.arrowBlinkTimer > 0) {
             const blinkProgress = 1 - (this.arrowBlinkTimer / 150);
@@ -184,21 +196,19 @@ export class Player extends Entity {
     update(deltaTime) {
         if (this.spawnTimer > 0) this.spawnTimer -= deltaTime;
         if (this.arrowBlinkTimer > 0) this.arrowBlinkTimer -= deltaTime;
-        
+
         if (this.collisionEffectTimer > 0) {
             this.collisionEffectTimer -= deltaTime;
             const recoveryDuration = 3000;
-            if (this.collisionEffectTimer > recoveryDuration) {
-                this.speed = CONFIG.PLAYER_BASE_SPEED * 0.7;
-                this.collisionAlpha = 0.5;
-            } else {
-                const progress = (recoveryDuration - this.collisionEffectTimer) / recoveryDuration;
-                this.speed = CONFIG.PLAYER_BASE_SPEED * (0.7 + 0.3 * progress);
-                this.collisionAlpha = 0.5 + 0.5 * progress;
-            }
+            const progress = (recoveryDuration - Math.max(0, this.collisionEffectTimer)) / recoveryDuration;
+
+            // Just recover alpha, keep speed constant
+            this.collisionAlpha = 0.5 + 0.5 * progress;
         } else {
-            this.speed = CONFIG.PLAYER_BASE_SPEED;
             this.collisionAlpha = 1.0;
         }
+
+        // Ensure speed is ALWAYS constant
+        this.speed = CONFIG.PLAYER_BASE_SPEED;
     }
 }

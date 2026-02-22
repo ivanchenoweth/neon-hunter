@@ -54,13 +54,15 @@ export class CollisionSystem {
 
         // Player vs Enemy
         if (a.type === 'player' && b.type === 'enemy') {
+            if (a.spawnTimer > 0 || a.collisionEffectTimer > 0) return; // Ghost state
             a.takeDamage(1, worldState);
-            b.active = false;
+            b.takeDamage(1, worldState);
             return;
         }
         if (b.type === 'player' && a.type === 'enemy') {
+            if (b.spawnTimer > 0 || b.collisionEffectTimer > 0) return; // Ghost state
             b.takeDamage(1, worldState);
-            a.active = false;
+            a.takeDamage(1, worldState);
             return;
         }
 
@@ -79,7 +81,7 @@ export class CollisionSystem {
             }
             return;
         }
-        
+
         // Enemy vs Enemy (Separation/Bouncing)
         if (a.type === 'enemy' && b.type === 'enemy') {
             const dx = a.x - b.x;

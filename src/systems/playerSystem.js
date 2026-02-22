@@ -3,18 +3,27 @@ import { CONFIG } from '../config/constants.js?v=29';
 export class PlayerSystem {
     constructor() {
         this.shotTimer = 0;
-        this.shotInterval = 100;
+        this.shotInterval = CONFIG.PLAYER_SHOT_INTERVAL;
         this.beamSoundTimer = 0;
     }
 
     update(deltaTime, worldState) {
-        const { input, entityManager, engine } = worldState;
+        const { input, entityManager, engine, audioSystem } = worldState;
         const player = engine.player;
-        if (!player || !player.active || engine.gameState !== 'PLAYING') return;
+
+        if (!player || !player.active || engine.gameState !== 'PLAYING') {
+            if (audioSystem) audioSystem.stopLaserCharge();
+            return;
+        }
 
         this.handleMovement(player, input, deltaTime);
         this.handleAiming(player, input, engine.camera);
-        this.handleShooting(player, input, entityManager, deltaTime, worldState);
+
+        // Stabilized shooting: check if not charging beam
+        if (!player.isChargingBeam) {
+            this.handleShooting(player, input, entityManager, deltaTime, worldState);
+        }
+
         this.handleBeam(player, input, deltaTime, worldState);
         player.update(deltaTime);
     }
@@ -72,9 +81,16 @@ export class PlayerSystem {
         this.shotTimer += deltaTime;
         const isShooting = input.leftMouseDown || input.keys[' '] || input.keys.j || input.keys.k || input.keys.l || input.keys.i || (input.joystickRight && input.joystickRight.active);
 
-        if (isShooting && this.shotTimer > this.shotInterval && player.spawnTimer <= 0) {
+        // Cap timer while not shooting so the first shot is instant but doesn't cause a burst
+        if (!isShooting && this.shotTimer > this.shotInterval) {
+            this.shotTimer = this.shotInterval;
+        }
+
+        if (isShooting && this.shotTimer >= this.shotInterval && player.spawnTimer <= 0) {
             entityManager.get('bullet', player.x, player.y, player.fireDirection.x, player.fireDirection.y);
-            this.shotTimer = 0;
+            // With fixed timestep, subtraction is perfectly accurate and ensures zero drift
+            this.shotTimer -= this.shotInterval;
+
             const engine = worldState.engine || this.engine;
             if (engine && engine.audioSystem) engine.audioSystem.playShoot();
         }
@@ -88,13 +104,28 @@ export class PlayerSystem {
             if (!player.isChargingBeam) {
                 player.isChargingBeam = true;
                 player.beamChargeTime = 0;
+                if (audioSystem) audioSystem.playLaserCharge(player.maxBeamChargeTime / 1000);
             }
             player.beamChargeTime += deltaTime;
             if (player.beamChargeTime > player.maxBeamChargeTime) player.beamChargeTime = player.maxBeamChargeTime;
 
             const progress = player.beamChargeTime / player.maxBeamChargeTime;
-            // Mixed linear + quadratic growth
-            player.beamLength = (progress * 0.3 + Math.pow(progress, 2) * 0.7) * 2000;
+            // Mixed linear + quadratic growth, max length 6000 ensures reaching world borders
+            const rawLength = (progress * 0.3 + Math.pow(progress, 2) * 0.7) * 6000;
+
+            // RAY-BOX INTERSECTION: Find exact distance to world border in direction of fire
+            const halfW = CONFIG.WORLD_WIDTH / 2;
+            const halfH = CONFIG.WORLD_HEIGHT / 2;
+
+            let distToBorder = Infinity;
+            if (player.fireDirection.x > 0) distToBorder = Math.min(distToBorder, (halfW - player.x) / player.fireDirection.x);
+            else if (player.fireDirection.x < 0) distToBorder = Math.min(distToBorder, (-halfW - player.x) / player.fireDirection.x);
+
+            if (player.fireDirection.y > 0) distToBorder = Math.min(distToBorder, (halfH - player.y) / player.fireDirection.y);
+            else if (player.fireDirection.y < 0) distToBorder = Math.min(distToBorder, (-halfH - player.y) / player.fireDirection.y);
+
+            // Set beamLength to the lesser of raw growth or distance to border
+            player.beamLength = Math.min(rawLength, distToBorder);
 
             this.beamSoundTimer += deltaTime;
             if (this.beamSoundTimer > 100 && audioSystem) {
@@ -102,11 +133,28 @@ export class PlayerSystem {
                 this.beamSoundTimer = 0;
             }
         } else if (player.isChargingBeam) {
+            if (audioSystem) audioSystem.stopLaserCharge();
             // Trigger Beam Explosion
             const progress = player.beamChargeTime / player.maxBeamChargeTime;
-            const tipX = player.x + player.fireDirection.x * player.beamLength;
-            const tipY = player.y + player.fireDirection.y * player.beamLength;
-            
+
+            // Safety Margin for Teleportation (so player doesn't clip into border)
+            const margin = 20;
+            const halfW = CONFIG.WORLD_WIDTH / 2;
+            const halfH = CONFIG.WORLD_HEIGHT / 2;
+
+            // Calculate distance to safe inner border
+            let distToSafeBorder = Infinity;
+            if (player.fireDirection.x > 0) distToSafeBorder = Math.min(distToSafeBorder, (halfW - margin - player.x) / player.fireDirection.x);
+            else if (player.fireDirection.x < 0) distToSafeBorder = Math.min(distToSafeBorder, (-halfW + margin - player.x) / player.fireDirection.x);
+
+            if (player.fireDirection.y > 0) distToSafeBorder = Math.min(distToSafeBorder, (halfH - margin - player.y) / player.fireDirection.y);
+            else if (player.fireDirection.y < 0) distToSafeBorder = Math.min(distToSafeBorder, (-halfH + margin - player.y) / player.fireDirection.y);
+
+            // Target position should be clamped by safe border distance
+            const teleportDist = Math.max(0, Math.min(player.beamLength, distToSafeBorder));
+            const tipX = player.x + player.fireDirection.x * teleportDist;
+            const tipY = player.y + player.fireDirection.y * teleportDist;
+
             this.triggerBeamExplosion(tipX, tipY, progress, worldState);
 
             // TELEPORT Logic
@@ -134,12 +182,12 @@ export class PlayerSystem {
     triggerBeamExplosion(x, y, progress, worldState) {
         const { entityManager, audioSystem } = worldState;
         const radius = 60 + progress * 180;
-        
+
         // Kill enemies in radius
         const enemies = entityManager.getEntitiesByType('enemy');
         for (const enemy of enemies) {
             if (!enemy.active) continue;
-            const dist = Math.sqrt((enemy.x - x)**2 + (enemy.y - y)**2);
+            const dist = Math.sqrt((enemy.x - x) ** 2 + (enemy.y - y) ** 2);
             if (dist < radius) {
                 enemy.takeDamage(1, worldState);
             }
@@ -157,7 +205,6 @@ export class PlayerSystem {
     }
 
     onWarp(level) {
-        // Increase fire rate slightly with warp?
-        this.shotInterval = Math.max(50, 100 - (level - 1) * 5);
+        // Cadence remains constant as requested by user
     }
 }
