@@ -9,6 +9,7 @@ export class Entity {
         this.active = false;
         this.isMarkedForRemoval = false;
         this.type = 'unknown';
+        this._isManaged = false;
     }
 
     init(x, y, ...args) {

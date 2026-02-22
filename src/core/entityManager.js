@@ -47,8 +47,12 @@ export class EntityManager {
         entity.isMarkedForRemoval = false;
 
         pool.busy.push(entity);
-        this.entities.push(entity);
-        this._getGroup(type).push(entity);
+
+        if (!entity._isManaged) {
+            this.entities.push(entity);
+            this._getGroup(type).push(entity);
+            entity._isManaged = true;
+        }
 
         return entity;
     }
@@ -75,11 +79,12 @@ export class EntityManager {
                 if (gIdx !== -1) group.splice(gIdx, 1);
             }
 
-            // Remove from busy pool
-            const bIdx = pool.busy.indexOf(entity);
+            // Remove from busy pool (lastIndexOf is faster for recently added entities)
+            const bIdx = pool.busy.lastIndexOf(entity);
             if (bIdx !== -1) pool.busy.splice(bIdx, 1);
 
             entity.reset();
+            entity._isManaged = false;
             pool.available.push(entity);
         }
     }

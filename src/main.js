@@ -45,6 +45,7 @@ function initGame() {
     const renderSystem = new RenderSystem(canvas, engine.camera);
 
     // LOGIC Phase Order
+    engine.systemManager.addSystem(inputSystem, 'logic');
     engine.systemManager.addSystem(new ActionSystem(), 'logic');
     engine.systemManager.addSystem(stateSystem, 'logic'); // Transition state next
     engine.systemManager.addSystem(new PlayerSystem(), 'logic');

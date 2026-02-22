@@ -176,8 +176,6 @@ export class Player extends Entity {
         const widthScale = (this.beamChargeTime / this.maxBeamChargeTime);
         ctx.lineWidth = 4 + widthScale * 12;
         ctx.lineCap = 'round';
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = '#ff44ff';
 
         ctx.beginPath();
         ctx.moveTo(this.x, this.y);

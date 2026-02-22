@@ -16,7 +16,7 @@ export class RenderSystem {
         this.bloomCtx = this.bloomCanvas.getContext('2d', { alpha: true });
         this.blurCanvas = document.createElement('canvas');
         this.blurCtx = this.blurCanvas.getContext('2d', { alpha: true });
-        
+
         this.handleResize();
     }
 
@@ -102,7 +102,7 @@ export class RenderSystem {
         ctx.strokeStyle = CONFIG.COLORS.PLAYER;
         ctx.lineWidth = 5;
         ctx.strokeRect(-halfW, -halfH, CONFIG.WORLD_WIDTH, CONFIG.WORLD_HEIGHT);
-        
+
         // Add a secondary inner glow line
         ctx.strokeStyle = '#fff';
         ctx.lineWidth = 1;
@@ -121,19 +121,28 @@ export class RenderSystem {
     drawBloomPass(worldState) {
         const { entityManager } = worldState;
         const bCtx = this.bloomCtx;
-        
+
         // Safety check for 0x0 canvas which can cause some browsers to crash on drawImage later
         if (this.bloomCanvas.width === 0 || this.bloomCanvas.height === 0) return;
 
         bCtx.clearRect(0, 0, this.bloomCanvas.width, this.bloomCanvas.height);
-        
+
         bCtx.save();
         bCtx.scale(this.bloomScale * this.camera.zoom, this.bloomScale * this.camera.zoom);
         bCtx.translate(-this.camera.x, -this.camera.y);
 
-        for (const entity of entityManager.entities) {
-            if (entity.active && (entity.type === 'bullet' || entity.type === 'player' || entity.type === 'particle')) {
-                if (entity.draw) entity.draw(bCtx);
+        const types = ['bullet', 'player', 'particle', 'enemy', 'food'];
+        for (const type of types) {
+            const group = entityManager.getEntitiesByType(type);
+            for (let i = 0; i < group.length; i++) {
+                const entity = group[i];
+                if (entity.active && entity.draw) {
+                    entity.draw(bCtx);
+                    // Double pass for enemies and food for extra pop
+                    if (type === 'enemy' || type === 'food') {
+                        entity.draw(bCtx);
+                    }
+                }
             }
         }
         bCtx.restore();
@@ -142,10 +151,10 @@ export class RenderSystem {
     compositeBloom(ctx, width, height) {
         if (this.blurCanvas.width === 0 || this.blurCanvas.height === 0) return;
 
-        // Blur
+        // Blur - Restored to 8px for softer neon glow
         this.blurCtx.clearRect(0, 0, this.blurCanvas.width, this.blurCanvas.height);
         try {
-            this.blurCtx.filter = 'blur(4px)';
+            this.blurCtx.filter = 'blur(8px)';
             this.blurCtx.drawImage(this.bloomCanvas, 0, 0);
         } catch (e) {
             // Filter might not be supported, just draw normally
