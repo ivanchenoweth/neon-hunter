@@ -189,7 +189,7 @@ export class PlayerSystem {
             if (!enemy.active) continue;
             const dist = Math.sqrt((enemy.x - x) ** 2 + (enemy.y - y) ** 2);
             if (dist < radius) {
-                enemy.takeDamage(1, worldState);
+                enemy.takeDamage(1, worldState, worldState.engine.player.fireDirection);
             }
         }
 

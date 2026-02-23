@@ -43,26 +43,26 @@ export class CollisionSystem {
         // Bullet vs Enemy
         if (a.type === 'bullet' && b.type === 'enemy') {
             a.active = false;
-            b.takeDamage(1, worldState);
+            b.takeDamage(1, worldState, { x: a.vx, y: a.vy });
             return;
         }
         if (b.type === 'bullet' && a.type === 'enemy') {
             b.active = false;
-            a.takeDamage(1, worldState);
+            a.takeDamage(1, worldState, { x: b.vx, y: b.vy });
             return;
         }
 
         // Player vs Enemy
         if (a.type === 'player' && b.type === 'enemy') {
             if (a.spawnTimer > 0 || a.collisionEffectTimer > 0) return; // Ghost state
-            a.takeDamage(1, worldState);
-            b.takeDamage(1, worldState);
+            a.takeDamage(1, worldState, { x: b.vx, y: b.vy });
+            b.takeDamage(1, worldState, { x: a.vx, y: a.vy });
             return;
         }
         if (b.type === 'player' && a.type === 'enemy') {
             if (b.spawnTimer > 0 || b.collisionEffectTimer > 0) return; // Ghost state
-            b.takeDamage(1, worldState);
-            a.takeDamage(1, worldState);
+            b.takeDamage(1, worldState, { x: a.vx, y: a.vy });
+            a.takeDamage(1, worldState, { x: b.vx, y: b.vy });
             return;
         }
 

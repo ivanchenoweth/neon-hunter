@@ -14,9 +14,11 @@ export class SystemManager {
     }
 
     update(deltaTime, worldState) {
-        const isPaused = worldState.engine && worldState.engine.gameState === 'PAUSED';
+        const state = worldState.engine ? worldState.engine.gameState : 'PLAYING';
+        const isFrozen = state !== 'PLAYING';
+
         for (const system of this.logicSystems) {
-            if (isPaused && !system.updateDuringPause) continue;
+            if (isFrozen && !system.updateDuringPause) continue;
             system.update(deltaTime, worldState);
         }
     }

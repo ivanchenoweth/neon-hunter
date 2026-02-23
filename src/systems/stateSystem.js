@@ -79,20 +79,39 @@ export class StateSystem {
                 this.menuCooldown = 200;
                 if (worldState.audioSystem) worldState.audioSystem.playShoot();
             } else if (input.keys.enter || input.virtualBeamButton) {
+                input.keys.enter = false;
                 this.activateMenuSelection(worldState);
                 this.menuCooldown = 200;
             }
-        } else if (this.currentState === GAME_STATES.PLAYING) {
-            if (input.keys.p) {
+        } else if (this.currentState === GAME_STATES.PLAYING && this.menuCooldown <= 0) {
+            if (input.keys.p || input.keys.escape) {
                 this.currentState = GAME_STATES.PAUSED;
                 this.engine.gameState = GAME_STATES.PAUSED;
                 input.keys.p = false;
+                input.keys.escape = false;
+                this.menuCooldown = 250;
+            } else if (input.keys.enter) {
+                this.currentState = GAME_STATES.INITIAL;
+                this.engine.gameState = GAME_STATES.INITIAL;
+                this.sessionActive = false;
+                input.keys.enter = false;
+                this.menuCooldown = 300;
+                if (this.engine.audioSystem) this.engine.audioSystem.stopLaserCharge();
             }
-        } else if (this.currentState === GAME_STATES.PAUSED) {
-            if (input.keys.p) {
+        } else if (this.currentState === GAME_STATES.PAUSED && this.menuCooldown <= 0) {
+            if (input.keys.p || input.keys.escape) {
                 this.currentState = GAME_STATES.PLAYING;
                 this.engine.gameState = GAME_STATES.PLAYING;
                 input.keys.p = false;
+                input.keys.escape = false;
+                this.menuCooldown = 250;
+            } else if (input.keys.enter) {
+                this.currentState = GAME_STATES.INITIAL;
+                this.engine.gameState = GAME_STATES.INITIAL;
+                this.sessionActive = false;
+                input.keys.enter = false;
+                this.menuCooldown = 300;
+                if (this.engine.audioSystem) this.engine.audioSystem.stopLaserCharge();
             }
         } else if (this.currentState === GAME_STATES.GAME_OVER && this.menuCooldown <= 0) {
             // Reset selection if first time entering Game Over this session

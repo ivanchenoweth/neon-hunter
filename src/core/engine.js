@@ -105,7 +105,7 @@ export class Engine {
             stateSystem: this.stateSystem
         };
 
-        if (this.gameState === 'PAUSED') {
+        if (this.gameState !== 'PLAYING') {
             this.systemManager.update(deltaTime, worldState);
             return;
         }

@@ -36,7 +36,7 @@ export class Player extends Entity {
         this.active = true;
     }
 
-    takeDamage(amount, worldState) {
+    takeDamage(amount, worldState, impactDir = null) {
         if (this.spawnTimer > 0 || this.collisionEffectTimer > 0) return; // Invulnerable during spawn or blink
 
         this.lives -= amount;
@@ -52,6 +52,24 @@ export class Player extends Entity {
 
         if (this.lives <= 0) {
             this.active = false;
+
+            // Player death explosion with momentum
+            let biasX = this.vx || 0;
+            let biasY = this.vy || 0;
+            if (impactDir) {
+                const mag = Math.sqrt(impactDir.x ** 2 + impactDir.y ** 2) || 1;
+                biasX += (impactDir.x / mag) * 200; // Player gets slightly more impact "pop"
+                biasY += (impactDir.y / mag) * 200;
+            }
+
+            for (let i = 0; i < 100; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 50 + Math.random() * 300;
+                const vx = Math.cos(angle) * speed + biasX;
+                const vy = Math.sin(angle) * speed + biasY;
+                worldState.entityManager.get('particle', this.x, this.y, this.color, 8 + Math.random() * 12, vx, vy);
+            }
+
             if (worldState.stateSystem) {
                 worldState.stateSystem.gameOver();
             }

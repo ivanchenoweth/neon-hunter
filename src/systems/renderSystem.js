@@ -138,8 +138,8 @@ export class RenderSystem {
                 const entity = group[i];
                 if (entity.active && entity.draw) {
                     entity.draw(bCtx);
-                    // Double pass for enemies and food for extra pop
-                    if (type === 'enemy' || type === 'food') {
+                    // Double pass for enemies, food, and player for extra pop
+                    if (type === 'enemy' || type === 'food' || type === 'player') {
                         entity.draw(bCtx);
                     }
                 }
@@ -151,10 +151,10 @@ export class RenderSystem {
     compositeBloom(ctx, width, height) {
         if (this.blurCanvas.width === 0 || this.blurCanvas.height === 0) return;
 
-        // Blur - Restored to 8px for softer neon glow
+        // Blur - Increased to 32px (on 0.25x buffer) for massive neon glow
         this.blurCtx.clearRect(0, 0, this.blurCanvas.width, this.blurCanvas.height);
         try {
-            this.blurCtx.filter = 'blur(8px)';
+            this.blurCtx.filter = 'blur(24px)'; // 24-32px creates the desired soft halo
             this.blurCtx.drawImage(this.bloomCanvas, 0, 0);
         } catch (e) {
             // Filter might not be supported, just draw normally
