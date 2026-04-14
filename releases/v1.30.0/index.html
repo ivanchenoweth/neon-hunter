@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Prueba API real</title>
+</head>
+
+<body>
+    <div id="version-info" style="position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 9999; text-align: center;">
+        <span class="version-badge">v1.30.0-turbo-specter</span>
+        <div class="version-meta">main • 2026-04-14 18:19</div>
+    </div>
+    <h1>Probar flujo real (con sesión)</h1>
+
+    <input type="text" id="user_name" placeholder="Usuario">
+    <input type="text" id="emailUser" placeholder="Email">
+    <input type="text" id="token" placeholder="API Key o Token">
+
+    <button onclick="enviar()">Enviar</button>
+
+    <form id="formApi" method="POST" action="https://accede.estudio.app/ventas-acatlan">
+        <input type="hidden" name="user_name" id="user_name_hidden">
+        <input type="hidden" name="email" id="email_hidden">
+        <input type="hidden" name="api_key" id="token_hidden">
+    </form>
+
+    <script>
+        function enviar() {
+            const userName = document.getElementById("user_name").value;
+            const emailUser = document.getElementById("emailUser").value;
+            const token = document.getElementById("token").value;
+
+            // Asignar valores al form oculto
+            document.getElementById("user_name_hidden").value = userName;
+            document.getElementById("email_hidden").value = emailUser;
+            document.getElementById("token_hidden").value = token;
+
+            // Enviar formulario (esto SÍ crea sesión correctamente)
+            document.getElementById("formApi").submit();
+        }
+    </script>
+</body>
+
+</html>
